@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Nirahh Note</title>
+<meta name="description" content="On presence, fabric, and what we choose to wear into a room.">
+<link rel="icon" href="assets/images/favicon.png?v=b4f68444" type="image/png">
+<link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png?v=bdf31ef2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Parisienne&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css?v=d0c69fab">
+<style>
+  .page-head{padding:clamp(3rem,6vw,5rem) 0 clamp(2rem,4vw,3rem);text-align:center}
+  .feature{display:grid;grid-template-columns:1.1fr 1fr;gap:clamp(2rem,5vw,4.5rem);align-items:center;
+    padding-bottom:clamp(3rem,6vw,5rem);border-bottom:1px solid var(--line)}
+  .feature img{aspect-ratio:4/3;object-fit:cover}
+  .article-list{list-style:none;padding:0;margin:0}
+  .article-list li{border-bottom:1px solid var(--line)}
+  .article-list a{display:grid;grid-template-columns:auto 1fr auto;gap:clamp(1rem,3vw,3rem);
+    align-items:baseline;padding:1.9rem 0;transition:padding-left .4s ease}
+  .article-list a:hover{padding-left:.75rem}
+    .article-list .k{font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);min-width:9ch}
+    .article-list h3{font-family:var(--serif);font-size:clamp(1.15rem,2vw,1.5rem);font-weight:300}
+    .article-list .t{min-width:0}
+    .article-list .t p{font-size:.88rem;line-height:1.65;color:var(--muted);margin:.5rem 0 0;max-width:60ch}
+  .article-list .r{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  @media(max-width:820px){
+    .feature{grid-template-columns:1fr}
+    .article-list a{grid-template-columns:1fr;gap:.5rem}
+  }
+</style>
+</head>
+<body>
+
+<p class="announce">Complimentary shipping on all orders above ₹5,000</p>
+
+<header class="site-header" id="siteHeader">
+  <div class="header-top">
+
+    <div class="header-left">
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" id="navToggle">
+        <span></span><span></span>
+      </button>
+      <a class="logo" href="index.html" aria-label="Nirahh — home">
+        <img src="assets/images/logo-mark.png?v=b4723c3e" alt="Nirahh">
+      </a>
+    </div>
+
+    <a class="brand" href="index.html">
+      <span class="wordmark">NIRAHH</span>
+      <span class="brand-rule">
+        <svg class="lotus" viewBox="0 0 30 14" aria-hidden="true">
+          <path d="M15 1.1c1.8 2.9 1.8 7.7 0 11-1.8-3.3-1.8-8.1 0-11Z"/>
+          <path d="M15 12.1c-2.5-.7-4.7-2.7-5.7-5.5-.3-.9.5-1.5 1.3-1C12.5 6.8 14.1 9.2 15 12.1Z"/>
+          <path d="M15 12.1c2.5-.7 4.7-2.7 5.7-5.5.3-.9-.5-1.5-1.3-1C17.5 6.8 15.9 9.2 15 12.1Z"/>
+          <path d="M15 12.5c-3.1-.2-6.1-1.6-8-3.9-.6-.7 0-1.6.9-1.4 3 .7 5.7 2.5 7.1 5.3Z"/>
+          <path d="M15 12.5c3.1-.2 6.1-1.6 8-3.9.6-.7 0-1.6-.9-1.4-3 .7-5.7 2.5-7.1 5.3Z"/>
+        </svg>
+      </span>
+      <span class="brand-sub">Made for composure</span>
+    </a>
+
+    <div class="header-actions">
+      <button class="icon-btn" aria-label="Search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      </button>
+      <button class="icon-btn" aria-label="Account">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg>
+      </button>
+      <button class="icon-btn bag" aria-label="Bag, 0 items">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 016 0v2"/></svg>
+        <span class="bag-count">0</span>
+      </button>
+    </div>
+
+  </div>
+
+  <nav class="site-nav" id="siteNav" aria-label="Primary">
+    <a href="index.html#moments">Shop by moment</a>
+    <a href="story.html">Our Story</a>
+    <a href="note.html">The Nirahh Note</a>
+  </nav>
+</header>
+
+<main>
+  <section class="wrap narrow page-head">
+    <p class="eyebrow">The Nirahh Note</p>
+    <h1 class="display">On presence, and what we<br>choose to wear into a room.</h1>
+  </section>
+
+  <section class="wrap">
+    <div class="feature reveal">
+      <figure style="margin:0"><img src="assets/images/moment-important-room.png?v=7d318de1" alt="A woman presenting in a boardroom"></figure>
+      <div>
+        <p class="eyebrow">Point of view</p>
+        <h2 class="display">How I choose a saree<br>for an important room</h2>
+        <p class="lead">At work, you should be respected for your work first. What you wear should only add to that — never distract from it. Here is what I check before anything else.</p>
+        <p style="margin-top:2rem"><a class="btn btn-ghost" href="#">Read the note</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section wrap">
+    <ul class="article-list reveal">
+      <li><a href="#"><span class="k">Presence</span><div class="t"><h3>What to wear when you're presenting to the board</h3><p>The room is already looking at you. The saree only has to hold still while you speak — nothing that slips off the shoulder, nothing that catches the light every time you turn to the screen.</p></div><span class="r">4 min</span></a></li>
+      <li><a href="#"><span class="k">Workday</span><div class="t"><h3>The saree for a day of back-to-back meetings</h3><p>Nine hours, four rooms, and no gap long enough to re-drape in. This is the one you can sit through, stand through, and stop thinking about by the second meeting.</p></div><span class="r">3 min</span></a></li>
+      <li><a href="#"><span class="k">Colour</span><div class="t"><h3>Three colours that work beautifully in a corporate setting</h3><p>Office lighting is unkind to most shades. These three keep their tone from a morning stand-up to an evening handover, and they photograph honestly when someone takes a group picture you didn't plan for.</p></div><span class="r">5 min</span></a></li>
+      <li><a href="#"><span class="k">Fabric</span><div class="t"><h3>Why linen behaves better than silk on a long day</h3><p>Silk looks beautiful for the first hour. Linen is the one still behaving at six o'clock — and the difference comes down to how each fabric handles heat, creasing and the back of a chair.</p></div><span class="r">4 min</span></a></li>
+      <li><a href="#"><span class="k">Drape</span><div class="t"><h3>Pleats that stay neat from the first meeting to the last</h3><p>Most sarees start fighting you by afternoon. A few decisions made at the pleating stage settle whether you spend the day adjusting your drape or getting on with your work.</p></div><span class="r">6 min</span></a></li>
+      <li><a href="#"><span class="k">Travel</span><div class="t"><h3>Packing a saree for a two-day work trip</h3><p>Folded with the crease in mind, a saree travels better than a blazer. What to carry, how to fold it into a cabin bag, and the one thing worth doing the night before.</p></div><span class="r">3 min</span></a></li>
+    </ul>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-base">
+    <p>© <span id="year"></span> Nirahh. Curated in Bengaluru.</p>
+    <p><a href="index.html">Home</a> · <a href="edit.html">The Edit</a> · <a href="story.html">Our story</a></p>
+  </div>
+</footer>
+
+<script src="assets/js/products.js?v=34927984"></script>
+
+<script src="assets/js/cart.js?v=e7c54917"></script>
+
+<script src="assets/js/main.js?v=c4c5075b"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+const U = process.env.U;
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 });
+const missing = [];
+p.on('response', r => { if (r.status() >= 400) missing.push(r.status() + ' ' + r.url()); });
+await p.goto(U, { waitUntil: 'networkidle' });
+await p.locator('#edit, .edit').first().scrollIntoViewIfNeeded();
+await p.waitForTimeout(1200);
+await p.locator('#edit, .edit').first().screenshot({ path: '/tmp/edit-rail.png' });
+const imgs = await p.$$eval('.product-media img', els => els.map(e => ({ src: e.getAttribute('src'), w: e.naturalWidth, h: e.naturalHeight, alt: e.alt })));
+console.log(JSON.stringify(imgs, null, 1));
+console.log('failed requests:', missing.length ? missing : 'none');
+await b.close();

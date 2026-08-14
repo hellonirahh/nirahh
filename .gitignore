@@ -1,0 +1,13 @@
+.DS_Store
+node_modules/
+
+# The virtualenv built for the image-processing scripts: 185 MB of installed
+# packages that anyone can rebuild from the imports in tools/*.py.
+tools/.venv/
+__pycache__/
+
+# GitHub Pages needs a public repository on the free plan, and this folder holds
+# source material that should not be: the printed business card, and the raw
+# vendor photographs of the sarees (price tags still attached). The processed
+# images the site actually serves live in assets/images/ and are published.
+reference/

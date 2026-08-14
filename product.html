@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Edit — Nirahh</title>
+<meta name="description" content="A saree from the Nirahh Edit.">
+<link rel="icon" href="assets/images/favicon.png?v=b4f68444" type="image/png">
+<link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png?v=bdf31ef2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Parisienne&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css?v=d0c69fab">
+</head>
+<body>
+
+<p class="announce">Complimentary shipping on all orders above ₹5,000</p>
+
+<header class="site-header" id="siteHeader">
+  <div class="header-top">
+
+    <div class="header-left">
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" id="navToggle">
+        <span></span><span></span>
+      </button>
+      <a class="logo" href="index.html" aria-label="Nirahh — home">
+        <img src="assets/images/logo-mark.png?v=b4723c3e" alt="Nirahh">
+      </a>
+    </div>
+
+    <a class="brand" href="index.html">
+      <span class="wordmark">NIRAHH</span>
+      <span class="brand-rule">
+        <svg class="lotus" viewBox="0 0 30 14" aria-hidden="true">
+          <path d="M15 1.1c1.8 2.9 1.8 7.7 0 11-1.8-3.3-1.8-8.1 0-11Z"/>
+          <path d="M15 12.1c-2.5-.7-4.7-2.7-5.7-5.5-.3-.9.5-1.5 1.3-1C12.5 6.8 14.1 9.2 15 12.1Z"/>
+          <path d="M15 12.1c2.5-.7 4.7-2.7 5.7-5.5.3-.9-.5-1.5-1.3-1C17.5 6.8 15.9 9.2 15 12.1Z"/>
+          <path d="M15 12.5c-3.1-.2-6.1-1.6-8-3.9-.6-.7 0-1.6.9-1.4 3 .7 5.7 2.5 7.1 5.3Z"/>
+          <path d="M15 12.5c3.1-.2 6.1-1.6 8-3.9.6-.7 0-1.6-.9-1.4-3 .7-5.7 2.5-7.1 5.3Z"/>
+        </svg>
+      </span>
+      <span class="brand-sub">Made for composure</span>
+    </a>
+
+    <div class="header-actions">
+      <button class="icon-btn" aria-label="Search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      </button>
+      <button class="icon-btn" aria-label="Account">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg>
+      </button>
+      <button class="icon-btn bag" aria-label="Bag, 0 items">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 016 0v2"/></svg>
+        <span class="bag-count is-empty">0</span>
+      </button>
+    </div>
+
+  </div>
+
+  <nav class="site-nav" id="siteNav" aria-label="Primary">
+    <a href="index.html#moments">Shop by moment</a>
+    <a href="story.html">Our Story</a>
+    <a href="note.html">The Nirahh Note</a>
+  </nav>
+</header>
+
+<main id="pdp"></main>
+
+<footer class="site-footer">
+  <div class="wrap footer-base">
+    <p>© <span id="year"></span> Nirahh. Curated in Bengaluru.</p>
+    <p><a href="index.html">Home</a> · <a href="edit.html">The Edit</a> · <a href="note.html">The Note</a> · <a href="story.html">Our story</a></p>
+  </div>
+</footer>
+
+<!-- Try-on modal -->
+<div class="modal" id="tryOnModal" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
+    <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+
+    <div class="modal-step" id="stepUpload">
+      <p class="eyebrow">See yourself in it</p>
+      <h3 id="tryOnTitle" class="display">Upload one photograph.</h3>
+      <p class="lead">Full length, standing, plain background works best. We'll show you this saree on you.</p>
+      <div class="upload-zone" id="uploadZone">
+        <p>Drop a photograph here, or <span>choose a file</span></p>
+        <input type="file" accept="image/*" id="uploadInput">
+      </div>
+      <p class="fineprint">Processed privately. Deleted after your session.</p>
+    </div>
+
+    <div class="modal-step" id="stepPreview" hidden>
+      <p class="eyebrow">See yourself in it</p>
+      <h3 class="display" id="previewTitle">Reading the drape&hellip;</h3>
+      <figure class="preview"><img id="previewImg" alt="The photograph you uploaded"></figure>
+      <p class="preview-status" id="previewStatus" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="previewStatusText">Placing the saree on you.</span>
+      </p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="resetBtn">Choose another</button>
+        <button class="btn btn-solid" id="doneBtn">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/products.js?v=34927984"></script>
+<script src="assets/js/cart.js?v=e7c54917"></script>
+<script src="assets/js/product-page.js?v=290304cc"></script>
+<script src="assets/js/main.js?v=c4c5075b"></script>
+</body>
+</html>
