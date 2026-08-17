@@ -158,7 +158,12 @@ button{font:inherit;cursor:pointer}
 .hero-copy .btn{align-self:flex-start}
 /* Absolute so the photograph fills the row instead of dictating its height. */
 .hero-media{margin:0;position:relative;overflow:hidden;min-height:inherit}
-.hero-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:58% 30%}
+/* The hero box changes shape with the viewport, so a fixed offset is only ever
+   right at one width — the previous 30% cut her head around 1100px. The
+   photograph now carries clear space above her (hairline at 16% of its
+   height), which leaves room to crop to 20% and stay clear at every width
+   the hero takes. Measured with tools/crop_positions.py. */
+.hero-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 20%}
 
 /* ---------- Pillars ---------- */
 .pillars-band{background:var(--sand);padding-block:clamp(.9rem,1.25vw,1.2rem)}
@@ -203,7 +208,7 @@ button{font:inherit;cursor:pointer}
   gap:clamp(.6rem,1.2vw,1rem);
 }
 .moment{position:relative;overflow:hidden;display:block}
-.moment img{aspect-ratio:4/5;object-fit:cover;width:100%;transition:transform 1s cubic-bezier(.2,.7,.3,1)}
+.moment img{aspect-ratio:4/5;object-fit:cover;width:100%;object-position:50% 10%;transition:transform 1s cubic-bezier(.2,.7,.3,1)}
 .moment:hover img{transform:scale(1.05)}
 .moment::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(18,15,12,.1) 40%,rgba(18,15,12,.78) 100%)}
 .moment-copy{position:absolute;left:1.1rem;right:1.1rem;bottom:1.1rem;z-index:2;color:#fff}
@@ -265,7 +270,20 @@ button{font:inherit;cursor:pointer}
 
 /* ---------- Note ---------- */
 .note-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:clamp(.85rem,1.6vw,1.4rem)}
-.note-card img{aspect-ratio:4/3;object-fit:cover;width:100%;margin-bottom:1rem}
+.note-card img{aspect-ratio:4/3;object-fit:cover;width:100%;object-position:50% 10%;margin-bottom:1rem}
+
+/* The photographs are 2:3 and every box above is squarer than that, so cover
+   has to throw away height. Centred — the browser default — it takes the crop
+   evenly off the top and bottom, and the head is at the top. Biasing to 10%
+   keeps the head for any normally framed standing portrait.
+   These three are framed so tightly that there is no room to bias at all;
+   measured with tools/crop_positions.py. */
+.moment img[src*="moment-evening"],
+.moment img[src*="moment-work-trip"],
+.moment img[src*="moment-celebration"],
+.note-card img[src*="moment-evening"],
+.note-card img[src*="moment-work-trip"],
+.note-card img[src*="moment-celebration"]{object-position:50% 0}
 .note-card h3{font-size:.88rem;line-height:1.5;font-weight:400;min-height:3.6em}
 .note-more{
   display:inline-block;margin-top:.6rem;font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;
@@ -443,7 +461,10 @@ button{font:inherit;cursor:pointer}
 @media(max-width:980px){
   .hero{grid-template-columns:1fr;min-height:0}
   .hero-media{order:-1;position:static}
-  .hero-media img{position:static;aspect-ratio:16/9;height:auto}
+  /* The photograph is 3:2. Cropping it to 16:9 here took the difference off
+     the top and cut her head; matching the source shows all of it, and costs
+     about 40px of height on a phone. */
+  .hero-media img{position:static;aspect-ratio:3/2;height:auto;object-position:50% 50%}
   .pov-grid,.tryon-grid,.pdp-grid{grid-template-columns:1fr}
   .worn-rail{grid-template-columns:1fr;gap:1.5rem}
   .footer-grid{grid-template-columns:1fr 1fr 1fr}
