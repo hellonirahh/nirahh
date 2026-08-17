@@ -1,0 +1,48 @@
+{
+  "general": {
+    "skip_to_content": "Skip to content",
+    "search": "Search",
+    "account": "Account",
+    "menu": "Menu",
+    "close": "Close"
+  },
+  "products": {
+    "product": {
+      "add_to_cart": "Add to bag",
+      "sold_out": "Taken",
+      "unavailable": "Unavailable",
+      "one_piece": "One piece only",
+      "in_stock": "in stock",
+      "view_details": "View details"
+    }
+  },
+  "cart": {
+    "general": {
+      "title": "Your bag",
+      "empty": "Your bag is empty.",
+      "subtotal": "Subtotal",
+      "checkout": "Proceed to checkout",
+      "continue": "Continue shopping",
+      "remove": "Remove",
+      "note": "Shipping calculated at checkout."
+    }
+  },
+  "blogs": {
+    "article": {
+      "read_more": "Read more"
+    }
+  },
+  "layout": {
+    "cart": {
+      "title": "Bag",
+      "items_count": {
+        "one": "{{ count }} item",
+        "other": "{{ count }} items"
+      }
+    }
+  },
+  "onboarding": {
+    "product_title": "Example saree",
+    "collection_title": "The Edit"
+  }
+}

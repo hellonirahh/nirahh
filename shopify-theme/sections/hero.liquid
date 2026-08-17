@@ -1,0 +1,65 @@
+<section class="hero">
+  <div class="hero-copy">
+    <h1 class="hero-statement">{{ section.settings.statement }}</h1>
+    {%- if section.settings.show_lockup -%}
+      <p class="hero-brand">{{ settings.wordmark | default: shop.name }}</p>
+      <span class="brand-rule compact">{% render 'lotus' %}</span>
+      <p class="hero-sub">{{ settings.tagline }}</p>
+    {%- endif -%}
+    {%- if section.settings.button_label != blank -%}
+      <a class="btn btn-solid" href="{{ section.settings.button_link | default: routes.all_products_collection_url }}">
+        {{ section.settings.button_label }}
+      </a>
+    {%- endif -%}
+  </div>
+  <figure class="hero-media">
+    {%- if section.settings.image != blank -%}
+      <img src="{{ section.settings.image | image_url: width: 1600 }}"
+           alt="{{ section.settings.image.alt | escape }}" width="1600" height="1000">
+    {%- else -%}
+      <img src="{{ 'hero.png' | asset_url }}"
+           alt="A woman in an ivory linen saree standing composed in a conference room"
+           width="1600" height="1000">
+    {%- endif -%}
+  </figure>
+</section>
+
+{% schema %}
+{
+  "name": "Hero",
+  "settings": [
+    {
+      "type": "html",
+      "id": "statement",
+      "label": "Statement",
+      "default": "A beautiful saree<br>should never outshine<br>the woman wearing it."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_lockup",
+      "label": "Show wordmark and tagline",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Explore the Edit"
+    },
+    {
+      "type": "url",
+      "id": "button_link",
+      "label": "Button link"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "Photograph",
+      "info": "Portrait or landscape both work; it is cropped to fill."
+    }
+  ],
+  "presets": [
+    { "name": "Hero" }
+  ]
+}
+{% endschema %}

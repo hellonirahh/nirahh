@@ -1,0 +1,124 @@
+{
+  "sections": {
+    "hero": {
+      "type": "hero",
+      "settings": {
+        "statement": "A beautiful saree<br>should never outshine<br>the woman wearing it.",
+        "show_lockup": true,
+        "button_label": "Explore the Edit"
+      }
+    },
+    "pillars": {
+      "type": "pillars",
+      "blocks": {
+        "light": {
+          "type": "pillar",
+          "settings": { "icon": "leaf", "heading": "Light fabrics", "body": "For long days" }
+        },
+        "quiet": {
+          "type": "pillar",
+          "settings": { "icon": "circle", "heading": "Quiet colours", "body": "Presentable always" }
+        },
+        "drapes": {
+          "type": "pillar",
+          "settings": { "icon": "drape", "heading": "Considered drapes", "body": "Comfort in every moment" }
+        }
+      },
+      "block_order": ["light", "quiet", "drapes"]
+    },
+    "moments": {
+      "type": "moments",
+      "settings": {
+        "heading": "Shop by moment",
+        "subheading": "Find the saree for every room you walk into."
+      },
+      "blocks": {
+        "office": { "type": "moment", "settings": { "heading": "Office drapes" } },
+        "boardroom": { "type": "moment", "settings": { "heading": "Boardroom drapes" } },
+        "evening": { "type": "moment", "settings": { "heading": "Evening drapes" } },
+        "travel": { "type": "moment", "settings": { "heading": "Travel drapes" } },
+        "celebration": { "type": "moment", "settings": { "heading": "Celebration drapes" } }
+      },
+      "block_order": ["office", "boardroom", "evening", "travel", "celebration"]
+    },
+    "edit": {
+      "type": "featured-edit",
+      "settings": {
+        "heading": "The Nirahh Edit",
+        "subheading": "A small collection of sarees we'd actually wear to work, meetings and events.",
+        "count": 6,
+        "link_label": "View all"
+      }
+    },
+    "pov": {
+      "type": "point-of-view",
+      "settings": {
+        "eyebrow": "The Nirahh point of view",
+        "heading": "We don't select a saree<br>because it's trending.",
+        "intro": "We ask:",
+        "link_label": "Our curation philosophy"
+      },
+      "blocks": {
+        "q1": { "type": "question", "settings": { "text": "Would I wear this into a room where my work matters?" } },
+        "q2": { "type": "question", "settings": { "text": "Does the colour hold its own without demanding attention?" } },
+        "q3": { "type": "question", "settings": { "text": "Does the fabric move comfortably through a long day?" } },
+        "q4": { "type": "question", "settings": { "text": "Does the drape make you feel more composed?" } }
+      },
+      "block_order": ["q1", "q2", "q3", "q4"]
+    },
+    "tryon": {
+      "type": "try-on",
+      "settings": {
+        "eyebrow": "See yourself in it",
+        "heading": "Not sure how it<br>will look on you?",
+        "button_label": "Try it on"
+      }
+    },
+    "note": {
+      "type": "note-feed",
+      "settings": {
+        "heading": "The Nirahh Note",
+        "subheading": "On presence, and what we choose to wear into a room.",
+        "count": 5,
+        "link_label": "View all articles"
+      }
+    },
+    "worn": {
+      "type": "worn-by",
+      "settings": {
+        "heading": "Worn by women who have rooms to run"
+      },
+      "blocks": {
+        "anita": {
+          "type": "testimonial",
+          "settings": {
+            "name": "Anita R.",
+            "role": "Technology Leader, Bengaluru",
+            "stars": 5,
+            "quote": "The sarees are light, elegant and perfect for long workdays. I always feel composed, never overdressed."
+          }
+        },
+        "meera": {
+          "type": "testimonial",
+          "settings": {
+            "name": "Meera S.",
+            "role": "Finance, Mumbai",
+            "stars": 5,
+            "quote": "Finally, sarees that are sophisticated and comfortable. My go-to for meetings and events."
+          }
+        },
+        "shalini": {
+          "type": "testimonial",
+          "settings": {
+            "name": "Shalini P.",
+            "role": "Consultant, Pune",
+            "stars": 5,
+            "quote": "The colours are thoughtful. They photograph well, travel well and wear even better."
+          }
+        }
+      },
+      "block_order": ["anita", "meera", "shalini"]
+    }
+  },
+  "order": ["hero", "pillars", "moments", "edit", "pov", "tryon", "note", "worn"]
+}

@@ -1,0 +1,76 @@
+{%- liquid
+  assign edit = collections[section.settings.collection]
+  assign count = section.settings.count
+-%}
+<section class="section edit" id="the-edit">
+  <div class="wrap rail-head reveal">
+    <div>
+      <h2 class="section-title">{{ section.settings.heading }}</h2>
+      {%- if section.settings.subheading != blank -%}
+        <p class="section-sub">{{ section.settings.subheading }}</p>
+      {%- endif -%}
+    </div>
+    {%- if edit != blank -%}
+      <a class="rail-link" href="{{ edit.url }}">{{ section.settings.link_label }}</a>
+    {%- endif -%}
+  </div>
+
+  <div class="wrap rail-wrap">
+    <div class="product-rail reveal" id="productRail">
+      {%- if edit.products_count > 0 -%}
+        {%- for product in edit.products limit: count -%}
+          {% render 'product-card', card_product: product %}
+        {%- endfor -%}
+      {%- else -%}
+        {%- comment -%} Nothing assigned yet — keep the rail looking right in the editor. {%- endcomment -%}
+        {%- for i in (1..count) -%}
+          {% render 'product-card' %}
+        {%- endfor -%}
+      {%- endif -%}
+    </div>
+    <button class="rail-next" data-rail="productRail" aria-label="Next products">&rsaquo;</button>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "The Edit",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "The Nirahh Edit"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "A small collection of sarees we'd actually wear to work, meetings and events."
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "Collection"
+    },
+    {
+      "type": "range",
+      "id": "count",
+      "label": "Sarees to show",
+      "min": 2,
+      "max": 12,
+      "step": 1,
+      "default": 6
+    },
+    {
+      "type": "text",
+      "id": "link_label",
+      "label": "Link label",
+      "default": "View all"
+    }
+  ],
+  "presets": [
+    { "name": "The Edit" }
+  ]
+}
+{% endschema %}

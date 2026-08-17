@@ -1,0 +1,17 @@
+{%- if section.settings.text != blank -%}
+  <p class="announce">{{ section.settings.text }}</p>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Announcement bar",
+  "settings": [
+    {
+      "type": "text",
+      "id": "text",
+      "label": "Text",
+      "default": "Complimentary shipping on all orders above ₹5,000"
+    }
+  ]
+}
+{% endschema %}

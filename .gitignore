@@ -11,3 +11,7 @@ __pycache__/
 # vendor photographs of the sarees (price tags still attached). The processed
 # images the site actually serves live in assets/images/ and are published.
 reference/
+
+# Built from shopify-theme/ by tools/build_theme.sh. Tracking it would put a
+# fresh 6 MB binary in the history on every theme edit.
+nirahh-shopify-theme.zip

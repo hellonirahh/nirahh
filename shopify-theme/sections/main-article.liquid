@@ -1,0 +1,25 @@
+<article class="wrap narrow page-head">
+  <p class="eyebrow">{{ blog.title | escape }}</p>
+  <h1 class="display">{{ article.title | escape }}</h1>
+</article>
+
+{%- if article.image -%}
+  <figure class="wrap" style="margin:0 auto clamp(2rem,4vw,3rem)">
+    <img src="{{ article.image | image_url: width: 1600 }}" alt="{{ article.image.alt | escape }}" width="1600" height="900">
+  </figure>
+{%- endif -%}
+
+<section class="wrap narrow rte" style="padding-bottom:clamp(3rem,6vw,5rem)">
+  {{ article.content }}
+
+  <p class="fineprint">
+    <a href="{{ blog.url }}">&larr; {{ blog.title | escape }}</a>
+  </p>
+</section>
+
+{% schema %}
+{
+  "name": "Article",
+  "settings": []
+}
+{% endschema %}

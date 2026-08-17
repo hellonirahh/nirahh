@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="{{ request.locale.iso_code }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="canonical" href="{{ canonical_url }}">
+
+  {%- if settings.favicon != blank -%}
+    <link rel="icon" href="{{ settings.favicon | image_url: width: 64 }}" type="image/png">
+  {%- else -%}
+    <link rel="icon" href="{{ 'favicon.png' | asset_url }}" type="image/png">
+  {%- endif -%}
+  <link rel="apple-touch-icon" href="{{ 'apple-touch-icon.png' | asset_url }}">
+
+  <title>{{ page_title }}{% if current_page != 1 %} &ndash; {{ current_page }}{% endif %}{% unless page_title contains shop.name %} &ndash; {{ shop.name }}{% endunless %}</title>
+
+  {%- if page_description -%}
+    <meta name="description" content="{{ page_description | escape }}">
+  {%- endif -%}
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Parisienne&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+
+  {{ 'style.css' | asset_url | stylesheet_tag }}
+
+  {%- comment -%}
+    The palette lives in the stylesheet as custom properties. Re-declaring it
+    here lets the colours be edited in Shopify without touching CSS.
+  {%- endcomment -%}
+  <style>
+    :root{
+      --ivory:{{ settings.colour_ivory }};
+      --paper:{{ settings.colour_paper }};
+      --sand:{{ settings.colour_sand }};
+      --ink:{{ settings.colour_ink }};
+      --muted:{{ settings.colour_muted }};
+      --line:{{ settings.colour_line }};
+      --gold:{{ settings.colour_gold }};
+      --gold-light:{{ settings.colour_gold_light }};
+      --gold-deep:{{ settings.colour_gold_deep }};
+    }
+  </style>
+
+  {{ content_for_header }}
+</head>
+
+<body class="template-{{ template.name | handle }}">
+
+  <a class="skip-link" href="#main">{{ 'general.skip_to_content' | t }}</a>
+
+  {% section 'announcement-bar' %}
+  {% section 'header' %}
+
+  <main id="main">
+    {{ content_for_layout }}
+  </main>
+
+  {% section 'footer' %}
+
+  <script src="{{ 'theme.js' | asset_url }}" defer></script>
+</body>
+</html>

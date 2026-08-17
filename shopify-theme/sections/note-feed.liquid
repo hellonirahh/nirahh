@@ -1,0 +1,84 @@
+{%- liquid
+  assign note = blogs[section.settings.blog]
+-%}
+<section class="section note">
+  <div class="wrap rail-head reveal">
+    <div>
+      <h2 class="section-title">{{ section.settings.heading }}</h2>
+      {%- if section.settings.subheading != blank -%}
+        <p class="section-sub">{{ section.settings.subheading }}</p>
+      {%- endif -%}
+    </div>
+    {%- if note != blank -%}
+      <a class="rail-link" href="{{ note.url }}">{{ section.settings.link_label }}</a>
+    {%- endif -%}
+  </div>
+
+  <div class="wrap note-grid reveal">
+    {%- if note.articles_count > 0 -%}
+      {%- for article in note.articles limit: section.settings.count -%}
+        <a class="note-card" href="{{ article.url }}">
+          {%- if article.image -%}
+            <img src="{{ article.image | image_url: width: 700 }}" alt="" width="700" height="525" loading="lazy">
+          {%- else -%}
+            {{ 'image' | placeholder_svg_tag: 'placeholder-svg' }}
+          {%- endif -%}
+          <h3>{{ article.title | escape }}</h3>
+          <span class="note-more">{{ 'blogs.article.read_more' | t }}</span>
+        </a>
+      {%- endfor -%}
+    {%- else -%}
+      {%- comment -%} No blog chosen yet; show the shape so the editor is readable. {%- endcomment -%}
+      {%- for i in (1..section.settings.count) -%}
+        <a class="note-card" href="#">
+          {{ 'image' | placeholder_svg_tag: 'placeholder-svg' }}
+          <h3>Write your first note</h3>
+          <span class="note-more">{{ 'blogs.article.read_more' | t }}</span>
+        </a>
+      {%- endfor -%}
+    {%- endif -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "The Nirahh Note",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "The Nirahh Note"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "On presence, and what we choose to wear into a room."
+    },
+    {
+      "type": "blog",
+      "id": "blog",
+      "label": "Blog"
+    },
+    {
+      "type": "range",
+      "id": "count",
+      "label": "Articles to show",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "default": 5
+    },
+    {
+      "type": "text",
+      "id": "link_label",
+      "label": "Link label",
+      "default": "View all articles"
+    }
+  ],
+  "presets": [
+    { "name": "The Nirahh Note" }
+  ]
+}
+{% endschema %}

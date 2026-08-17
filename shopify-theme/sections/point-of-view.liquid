@@ -1,0 +1,99 @@
+<section class="section pov">
+  <div class="pov-grid wrap reveal">
+    <figure class="pov-media">
+      {%- if section.settings.image != blank -%}
+        <img src="{{ section.settings.image | image_url: width: 1200 }}"
+             alt="{{ section.settings.image.alt | escape }}" width="1200" height="750" loading="lazy">
+      {%- else -%}
+        <img src="{{ 'pov-editorial.png' | asset_url }}"
+             alt="Hands feeling the weave of a folded linen saree" width="1200" height="750" loading="lazy">
+      {%- endif -%}
+    </figure>
+    <div class="pov-copy">
+      {%- if section.settings.eyebrow != blank -%}
+        <p class="eyebrow">{{ section.settings.eyebrow }}</p>
+      {%- endif -%}
+      <h2 class="display">{{ section.settings.heading }}</h2>
+      {%- if section.settings.intro != blank -%}
+        <p class="pov-intro">{{ section.settings.intro }}</p>
+      {%- endif -%}
+      {%- if section.blocks.size > 0 -%}
+        <ul class="pov-list">
+          {%- for block in section.blocks -%}
+            <li {{ block.shopify_attributes }}>{{ block.settings.text }}</li>
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+      {%- if section.settings.link_label != blank -%}
+        <a class="rail-link" href="{{ section.settings.link }}">{{ section.settings.link_label }}</a>
+      {%- endif -%}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Point of view",
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "Photograph"
+    },
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow",
+      "default": "The Nirahh point of view"
+    },
+    {
+      "type": "html",
+      "id": "heading",
+      "label": "Heading",
+      "default": "We don't select a saree<br>because it's trending."
+    },
+    {
+      "type": "text",
+      "id": "intro",
+      "label": "Intro",
+      "default": "We ask:"
+    },
+    {
+      "type": "text",
+      "id": "link_label",
+      "label": "Link label",
+      "default": "Our curation philosophy"
+    },
+    {
+      "type": "url",
+      "id": "link",
+      "label": "Link"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "question",
+      "name": "Question",
+      "settings": [
+        {
+          "type": "text",
+          "id": "text",
+          "label": "Question",
+          "default": "Would I wear this into a room where my work matters?"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Point of view",
+      "blocks": [
+        { "type": "question", "settings": { "text": "Would I wear this into a room where my work matters?" } },
+        { "type": "question", "settings": { "text": "Does the colour hold its own without demanding attention?" } },
+        { "type": "question", "settings": { "text": "Does the fabric move comfortably through a long day?" } },
+        { "type": "question", "settings": { "text": "Does the drape make you feel more composed?" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

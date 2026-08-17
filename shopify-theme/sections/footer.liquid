@@ -1,0 +1,127 @@
+<footer class="site-footer">
+  <div class="wrap footer-grid">
+
+    <div class="footer-brand">
+      <p class="wordmark footer-word">{{ settings.wordmark | default: shop.name }}</p>
+      <span class="brand-rule compact">{% render 'lotus' %}</span>
+      <p class="footer-tag">{{ settings.tagline }}</p>
+      {%- if section.settings.blurb != blank -%}
+        <p class="footer-note">{{ section.settings.blurb }}</p>
+      {%- endif -%}
+      <div class="social">
+        {%- if settings.social_instagram != blank -%}
+          <a href="{{ settings.social_instagram }}" aria-label="Instagram">IG</a>
+        {%- endif -%}
+        {%- if settings.social_facebook != blank -%}
+          <a href="{{ settings.social_facebook }}" aria-label="Facebook">FB</a>
+        {%- endif -%}
+        {%- if settings.social_whatsapp != blank -%}
+          <a href="{{ settings.social_whatsapp }}" aria-label="WhatsApp">WA</a>
+        {%- endif -%}
+      </div>
+    </div>
+
+    {%- for block in section.blocks -%}
+      {%- case block.type -%}
+
+        {%- when 'menu' -%}
+          <nav class="footer-col" aria-label="{{ block.settings.heading | escape }}" {{ block.shopify_attributes }}>
+            <h4>{{ block.settings.heading }}</h4>
+            {%- for link in block.settings.menu.links -%}
+              <a href="{{ link.url }}">{{ link.title }}</a>
+            {%- endfor -%}
+          </nav>
+
+        {%- when 'signup' -%}
+          <div class="footer-col footer-signup" {{ block.shopify_attributes }}>
+            <h4>{{ block.settings.heading }}</h4>
+            {%- if block.settings.body != blank -%}
+              <p class="footer-note">{{ block.settings.body }}</p>
+            {%- endif -%}
+            {%- form 'customer', id: 'signupForm', class: 'signup' -%}
+              {%- if form.posted_successfully? -%}
+                <p class="signup-msg">Thank you — you're on the list.</p>
+              {%- else -%}
+                <input type="hidden" name="contact[tags]" value="newsletter">
+                <input type="email" name="contact[email]" placeholder="Enter your email" aria-label="Your email" required>
+                <button type="submit">Subscribe</button>
+              {%- endif -%}
+            {%- endform -%}
+          </div>
+
+      {%- endcase -%}
+    {%- endfor -%}
+
+  </div>
+
+  <div class="wrap footer-base">
+    <p>&copy; {{ 'now' | date: '%Y' }} {{ shop.name }}. {{ section.settings.locality }}</p>
+    <p>{{ powered_by_link }}</p>
+  </div>
+</footer>
+
+{% schema %}
+{
+  "name": "Footer",
+  "settings": [
+    {
+      "type": "textarea",
+      "id": "blurb",
+      "label": "About line",
+      "default": "Curated sarees for corporate women who want to look composed — where the saree complements her, never competes with her."
+    },
+    {
+      "type": "text",
+      "id": "locality",
+      "label": "Locality line",
+      "default": "Curated in Bengaluru."
+    }
+  ],
+  "blocks": [
+    {
+      "type": "menu",
+      "name": "Menu column",
+      "limit": 3,
+      "settings": [
+        {
+          "type": "text",
+          "id": "heading",
+          "label": "Heading",
+          "default": "Shop"
+        },
+        {
+          "type": "link_list",
+          "id": "menu",
+          "label": "Menu",
+          "default": "footer"
+        }
+      ]
+    },
+    {
+      "type": "signup",
+      "name": "Email signup",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "text",
+          "id": "heading",
+          "label": "Heading",
+          "default": "Join the Nirahh Edit"
+        },
+        {
+          "type": "textarea",
+          "id": "body",
+          "label": "Body",
+          "default": "Style notes, new arrivals and curation straight to your inbox."
+        }
+      ]
+    }
+  ],
+  "default": {
+    "blocks": [
+      { "type": "menu" },
+      { "type": "signup" }
+    ]
+  }
+}
+{% endschema %}

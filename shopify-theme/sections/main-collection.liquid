@@ -1,0 +1,46 @@
+<section class="wrap page-head">
+  <p class="eyebrow">{{ collection.title | escape }}</p>
+  {%- if section.settings.heading != blank -%}
+    <h1 class="display">{{ section.settings.heading }}</h1>
+  {%- else -%}
+    <h1 class="display">{{ collection.title | escape }}</h1>
+  {%- endif -%}
+  {%- if collection.description != blank -%}
+    <div class="lead rte">{{ collection.description }}</div>
+  {%- endif -%}
+</section>
+
+<section class="wrap">
+  {%- if collection.products_count > 0 -%}
+    {%- paginate collection.products by 24 -%}
+      <div class="product-grid">
+        {%- for product in collection.products -%}
+          {% render 'product-card', card_product: product %}
+        {%- endfor -%}
+      </div>
+
+      {%- if paginate.pages > 1 -%}
+        <nav class="pagination" aria-label="Pagination">
+          {{ paginate | default_pagination }}
+        </nav>
+      {%- endif -%}
+    {%- endpaginate -%}
+  {%- else -%}
+    <p class="lead center" style="padding-block:3rem">Nothing here yet.</p>
+  {%- endif -%}
+</section>
+
+{% schema %}
+{
+  "name": "Collection",
+  "settings": [
+    {
+      "type": "html",
+      "id": "heading",
+      "label": "Heading",
+      "info": "Leave empty to use the collection's own title.",
+      "default": "Everything here passed one question:<br><em>would I wear this into a room where my work matters?</em>"
+    }
+  ]
+}
+{% endschema %}

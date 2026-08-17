@@ -1,0 +1,128 @@
+[
+  {
+    "name": "theme_info",
+    "theme_name": "Nirahh",
+    "theme_version": "1.0.0",
+    "theme_author": "Nirahh",
+    "theme_documentation_url": "https://github.com/hellonirahh/nirahh",
+    "theme_support_url": "https://github.com/hellonirahh/nirahh"
+  },
+  {
+    "name": "Brand",
+    "settings": [
+      {
+        "type": "image_picker",
+        "id": "logo",
+        "label": "Logo mark",
+        "info": "Sits in the top left. Leave empty to use the mark bundled with the theme."
+      },
+      {
+        "type": "image_picker",
+        "id": "favicon",
+        "label": "Favicon"
+      },
+      {
+        "type": "text",
+        "id": "wordmark",
+        "label": "Wordmark",
+        "default": "NIRAHH"
+      },
+      {
+        "type": "text",
+        "id": "tagline",
+        "label": "Tagline",
+        "default": "Made for composure"
+      }
+    ]
+  },
+  {
+    "name": "Colours",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Text colours were chosen for contrast. Lightening them makes small type hard to read."
+      },
+      {
+        "type": "color",
+        "id": "colour_ivory",
+        "label": "Page background",
+        "default": "#FBF8F3"
+      },
+      {
+        "type": "color",
+        "id": "colour_paper",
+        "label": "Panel background",
+        "default": "#F4EFE6"
+      },
+      {
+        "type": "color",
+        "id": "colour_sand",
+        "label": "Band background",
+        "default": "#EFE7DA"
+      },
+      {
+        "type": "color",
+        "id": "colour_ink",
+        "label": "Headings",
+        "default": "#23201C"
+      },
+      {
+        "type": "color",
+        "id": "colour_muted",
+        "label": "Body text",
+        "default": "#3A342C"
+      },
+      {
+        "type": "color",
+        "id": "colour_line",
+        "label": "Rules and borders",
+        "default": "#E2DACD"
+      },
+      {
+        "type": "color",
+        "id": "colour_gold",
+        "label": "Brand gold",
+        "default": "#9C7B48",
+        "info": "Sampled from the printed card. Changing this moves the wordmark away from the foil."
+      },
+      {
+        "type": "color",
+        "id": "colour_gold_deep",
+        "label": "Gold for small text",
+        "default": "#543F21"
+      },
+      {
+        "type": "color",
+        "id": "colour_gold_light",
+        "label": "Gold on dark",
+        "default": "#C0A070"
+      }
+    ]
+  },
+  {
+    "name": "Social",
+    "settings": [
+      {
+        "type": "text",
+        "id": "social_instagram",
+        "label": "Instagram URL"
+      },
+      {
+        "type": "text",
+        "id": "social_facebook",
+        "label": "Facebook URL"
+      },
+      {
+        "type": "text",
+        "id": "social_whatsapp",
+        "label": "WhatsApp URL"
+      },
+      {
+        "type": "text",
+        "id": "social_handle",
+        "label": "Handle shown on the testimonials band",
+        "default": "@nirahh.official"
+      }
+    ]
+  }
+]

@@ -1,0 +1,96 @@
+<section class="section worn">
+  <div class="wrap rail-head reveal">
+    <h2 class="section-title light">{{ section.settings.heading }}</h2>
+    {%- if settings.social_instagram != blank -%}
+      <a class="rail-link light" href="{{ settings.social_instagram }}">{{ settings.social_handle }}</a>
+    {%- else -%}
+      <span class="rail-link light">{{ settings.social_handle }}</span>
+    {%- endif -%}
+  </div>
+
+  <div class="wrap rail-wrap">
+    <div class="worn-rail reveal" id="wornRail">
+      {%- for block in section.blocks -%}
+        <figure class="worn-card" {{ block.shopify_attributes }}>
+          {%- if block.settings.image != blank -%}
+            <img class="worn-avatar" src="{{ block.settings.image | image_url: width: 124 }}"
+                 alt="{{ block.settings.name | escape }}" width="62" height="62" loading="lazy">
+          {%- endif -%}
+          <figcaption>
+            <p class="worn-name">{{ block.settings.name }}</p>
+            <p class="worn-role">{{ block.settings.role }}</p>
+            <p class="stars" aria-label="{{ block.settings.stars }} out of 5">
+              {%- for i in (1..block.settings.stars) -%}&#9733;{%- endfor -%}
+            </p>
+            <p class="worn-quote">{{ block.settings.quote }}</p>
+          </figcaption>
+        </figure>
+      {%- endfor -%}
+    </div>
+    <button class="rail-next light" data-rail="wornRail" aria-label="Next testimonials">&rsaquo;</button>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Worn by",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Worn by women who have rooms to run"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "testimonial",
+      "name": "Testimonial",
+      "settings": [
+        { "type": "image_picker", "id": "image", "label": "Portrait" },
+        { "type": "text", "id": "name", "label": "Name", "default": "Anita R." },
+        { "type": "text", "id": "role", "label": "Role", "default": "Technology Leader, Bengaluru" },
+        {
+          "type": "range",
+          "id": "stars",
+          "label": "Stars",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "default": 5
+        },
+        {
+          "type": "textarea",
+          "id": "quote",
+          "label": "Quote",
+          "default": "The sarees are light, elegant and perfect for long workdays. I always feel composed, never overdressed."
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Worn by",
+      "blocks": [
+        { "type": "testimonial" },
+        {
+          "type": "testimonial",
+          "settings": {
+            "name": "Meera S.",
+            "role": "Finance, Mumbai",
+            "quote": "Finally, sarees that are sophisticated and comfortable. My go-to for meetings and events."
+          }
+        },
+        {
+          "type": "testimonial",
+          "settings": {
+            "name": "Shalini P.",
+            "role": "Consultant, Pune",
+            "quote": "The colours are thoughtful. They photograph well, travel well and wear even better."
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,173 @@
+{%- liquid
+  assign variant = product.selected_or_first_available_variant
+  assign specs = 'fabric,length,drape,care' | split: ','
+-%}
+
+<nav class="crumbs wrap" aria-label="Breadcrumb">
+  <a href="{{ routes.root_url }}">Home</a><span>/</span>
+  {%- if collection -%}
+    <a href="{{ collection.url }}">{{ collection.title }}</a><span>/</span>
+  {%- endif -%}
+  <span aria-current="page">{{ product.title | escape }}</span>
+</nav>
+
+<div class="wrap pdp-grid">
+
+  <div class="pdp-gallery">
+    <figure class="pdp-main">
+      {%- if product.featured_image -%}
+        <img id="pdpMain"
+             src="{{ product.featured_image | image_url: width: 1200 }}"
+             alt="{{ product.featured_image.alt | default: product.title | escape }}"
+             width="1200" height="1600">
+      {%- else -%}
+        {{ 'product-1' | placeholder_svg_tag: 'placeholder-svg' }}
+      {%- endif -%}
+    </figure>
+
+    {%- if product.images.size > 1 -%}
+      <div class="pdp-thumbs">
+        {%- for image in product.images -%}
+          <button class="pdp-thumb{% if forloop.first %} active{% endif %}"
+                  type="button"
+                  data-full="{{ image | image_url: width: 1200 }}"
+                  data-alt="{{ image.alt | default: product.title | escape }}"
+                  aria-label="View image {{ forloop.index }}">
+            <img src="{{ image | image_url: width: 200 }}" alt="" width="200" height="266" loading="lazy">
+          </button>
+        {%- endfor -%}
+      </div>
+    {%- endif -%}
+  </div>
+
+  <div class="pdp-info">
+    <h1 class="pdp-title">{{ product.title | escape }}</h1>
+
+    {%- if product.type != blank -%}
+      <p class="pdp-fabric">{{ product.type | escape }}</p>
+    {%- endif -%}
+
+    <p class="pdp-price">
+      {{ variant.price | money }}
+      {%- if variant.compare_at_price > variant.price -%}
+        <s>{{ variant.compare_at_price | money }}</s>
+      {%- endif -%}
+    </p>
+
+    {%- if product.available -%}
+      {%- if variant.inventory_management == 'shopify' and variant.inventory_quantity == 1 -%}
+        <p class="pdp-stock">{{ 'products.product.one_piece' | t }} &middot; {{ 'products.product.in_stock' | t }}</p>
+      {%- endif -%}
+    {%- else -%}
+      <p class="pdp-stock">{{ 'products.product.sold_out' | t }}</p>
+    {%- endif -%}
+
+    {%- if product.description != blank -%}
+      <div class="pdp-intro rte">{{ product.description }}</div>
+    {%- endif -%}
+
+    {%- form 'product', product, id: 'productForm', class: 'pdp-form' -%}
+      {%- if product.has_only_default_variant -%}
+        <input type="hidden" name="id" value="{{ variant.id }}">
+      {%- else -%}
+        <div class="pdp-variants">
+          <label class="pdp-variant-label" for="variantSelect">{{ product.options_with_values.first.name }}</label>
+          <select id="variantSelect" name="id" class="pdp-variant-select">
+            {%- for v in product.variants -%}
+              <option value="{{ v.id }}"
+                      {% if v == variant %}selected{% endif %}
+                      {% unless v.available %}disabled{% endunless %}>
+                {{ v.title }} &middot; {{ v.price | money }}{% unless v.available %} &middot; {{ 'products.product.sold_out' | t }}{% endunless %}
+              </option>
+            {%- endfor -%}
+          </select>
+        </div>
+      {%- endif -%}
+
+      <div class="pdp-actions">
+        <button type="submit" name="add" class="btn btn-solid pdp-add"
+                {% unless product.available %}disabled{% endunless %}>
+          {%- if product.available -%}
+            {{ 'products.product.add_to_cart' | t }}
+          {%- else -%}
+            {{ 'products.product.sold_out' | t }}
+          {%- endif -%}
+        </button>
+        {%- if section.settings.show_try_on -%}
+          <a class="btn btn-ghost pdp-try" href="{{ routes.root_url }}#try-on">See yourself in it</a>
+        {%- endif -%}
+      </div>
+    {%- endform -%}
+
+    {%- comment -%}
+      Specifications come from product metafields so each saree can carry its
+      own, without the shop owner writing HTML. Namespace "custom", keys
+      fabric / length / drape / care. Any that are empty are skipped.
+    {%- endcomment -%}
+    {%- assign has_specs = false -%}
+    {%- for key in specs -%}
+      {%- if product.metafields.custom[key] != blank -%}{%- assign has_specs = true -%}{%- endif -%}
+    {%- endfor -%}
+
+    {%- if has_specs -%}
+      <dl class="pdp-specs">
+        {%- for key in specs -%}
+          {%- if product.metafields.custom[key] != blank -%}
+            <div class="spec">
+              <dt>{{ key | capitalize }}</dt>
+              <dd>{{ product.metafields.custom[key] }}</dd>
+            </div>
+          {%- endif -%}
+        {%- endfor -%}
+      </dl>
+    {%- endif -%}
+  </div>
+</div>
+
+{%- if section.settings.show_related -%}
+  <section class="section">
+    <div class="wrap rail-head">
+      <div><h2 class="section-title">{{ section.settings.related_heading }}</h2></div>
+      {%- if collection -%}
+        <a class="rail-link" href="{{ collection.url }}">View all</a>
+      {%- endif -%}
+    </div>
+    <div class="wrap">
+      <div class="product-grid">
+        {%- assign shown = 0 -%}
+        {%- for related in collections.all.products limit: 8 -%}
+          {%- if related.id != product.id and shown < 4 -%}
+            {% render 'product-card', card_product: related %}
+            {%- assign shown = shown | plus: 1 -%}
+          {%- endif -%}
+        {%- endfor -%}
+      </div>
+    </div>
+  </section>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Product",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_try_on",
+      "label": "Show the try-on button",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_related",
+      "label": "Show other sarees below",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "related_heading",
+      "label": "Heading for other sarees",
+      "default": "Also in the Edit"
+    }
+  ]
+}
+{% endschema %}

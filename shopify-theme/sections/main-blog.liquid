@@ -1,0 +1,42 @@
+<section class="wrap narrow page-head">
+  <p class="eyebrow">{{ blog.title | escape }}</p>
+  {%- if section.settings.heading != blank -%}
+    <h1 class="display">{{ section.settings.heading }}</h1>
+  {%- endif -%}
+</section>
+
+<section class="wrap">
+  {%- paginate blog.articles by 12 -%}
+    <div class="note-grid">
+      {%- for article in blog.articles -%}
+        <a class="note-card" href="{{ article.url }}">
+          {%- if article.image -%}
+            <img src="{{ article.image | image_url: width: 700 }}" alt="" width="700" height="525" loading="lazy">
+          {%- else -%}
+            {{ 'image' | placeholder_svg_tag: 'placeholder-svg' }}
+          {%- endif -%}
+          <h3>{{ article.title | escape }}</h3>
+          <span class="note-more">{{ 'blogs.article.read_more' | t }}</span>
+        </a>
+      {%- endfor -%}
+    </div>
+
+    {%- if paginate.pages > 1 -%}
+      <nav class="pagination" aria-label="Pagination">{{ paginate | default_pagination }}</nav>
+    {%- endif -%}
+  {%- endpaginate -%}
+</section>
+
+{% schema %}
+{
+  "name": "Blog",
+  "settings": [
+    {
+      "type": "html",
+      "id": "heading",
+      "label": "Heading",
+      "default": "On presence, and what we<br>choose to wear into a room."
+    }
+  ]
+}
+{% endschema %}

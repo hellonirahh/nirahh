@@ -1,0 +1,112 @@
+<section class="section tryon" id="try-on">
+  <div class="wrap tryon-grid reveal">
+    <div class="tryon-copy">
+      {%- if section.settings.eyebrow != blank -%}
+        <p class="eyebrow">{{ section.settings.eyebrow }}</p>
+      {%- endif -%}
+      <h2 class="display">{{ section.settings.heading }}</h2>
+      {%- if section.settings.body != blank -%}
+        <p class="lead">{{ section.settings.body }}</p>
+      {%- endif -%}
+      <button class="btn btn-solid" id="tryOnBtn" type="button">{{ section.settings.button_label }}</button>
+      {%- if section.settings.fineprint != blank -%}
+        <p class="fineprint">{{ section.settings.fineprint }}</p>
+      {%- endif -%}
+    </div>
+    <figure class="tryon-media">
+      <div class="phone">
+        {%- if section.settings.image != blank -%}
+          <img src="{{ section.settings.image | image_url: width: 600 }}"
+               alt="{{ section.settings.image.alt | escape }}" width="600" height="1066" loading="lazy">
+        {%- else -%}
+          <img src="{{ 'moment-celebration.png' | asset_url }}"
+               alt="A saree previewed on screen" width="600" height="1066" loading="lazy">
+        {%- endif -%}
+      </div>
+    </figure>
+  </div>
+</section>
+
+<div class="modal" id="tryOnModal" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
+    <button class="modal-close" id="modalClose" aria-label="{{ 'general.close' | t }}" type="button">&times;</button>
+
+    <div class="modal-step" id="stepUpload">
+      <p class="eyebrow">{{ section.settings.eyebrow }}</p>
+      <h3 id="tryOnTitle" class="display">Upload one photograph.</h3>
+      <p class="lead">Full length, standing, plain background works best.</p>
+      <div class="upload-zone" id="uploadZone">
+        <p>Drop a photograph here, or <span>choose a file</span></p>
+        <input type="file" accept="image/*" id="uploadInput">
+      </div>
+      <p class="fineprint">Processed privately. Deleted after your session.</p>
+    </div>
+
+    <div class="modal-step" id="stepPreview" hidden>
+      <p class="eyebrow">{{ section.settings.eyebrow }}</p>
+      <h3 class="display" id="previewTitle">Reading the drape&hellip;</h3>
+      <figure class="preview">
+        {%- comment -%} src is set from the file the customer picks. {%- endcomment -%}
+        <img id="previewImg" alt="The photograph you uploaded" width="900" height="1200">
+      </figure>
+      <p class="preview-status" id="previewStatus" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="previewStatusText">Placing the Edit on you.</span>
+      </p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="resetBtn" type="button">Choose another</button>
+        <button class="btn btn-solid" id="doneBtn" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "See yourself in it",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "A preview of the try-on idea. It shows the customer's own photograph back to them; it does not render the saree onto it yet."
+    },
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow",
+      "default": "See yourself in it"
+    },
+    {
+      "type": "html",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Not sure how it<br>will look on you?"
+    },
+    {
+      "type": "textarea",
+      "id": "body",
+      "label": "Body",
+      "default": "Upload one photograph and see the Nirahh Edit on yourself — privately, before you decide."
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Try it on"
+    },
+    {
+      "type": "text",
+      "id": "fineprint",
+      "label": "Fineprint",
+      "default": "Your photograph stays yours. It is never published, never shared."
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "Phone screen image"
+    }
+  ],
+  "presets": [
+    { "name": "See yourself in it" }
+  ]
+}
+{% endschema %}

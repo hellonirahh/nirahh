@@ -1,0 +1,37 @@
+{%- comment -%}
+  One saree in a rail or grid.
+  Accepts: card_product (a product object).
+  Falls back to a placeholder so the theme editor still looks right on a store
+  with no products loaded yet.
+{%- endcomment -%}
+<article class="product">
+  {%- if card_product == blank -%}
+    <a class="product-media" href="#">
+      {{ 'product-1' | placeholder_svg_tag: 'placeholder-svg' }}
+    </a>
+    <h3>{{ 'onboarding.product_title' | t }}</h3>
+    <p class="product-meta">Handwoven linen</p>
+    <p class="price">{{ 6548 | times: 100 | money }}</p>
+  {%- else -%}
+    <a class="product-media" href="{{ card_product.url }}">
+      {%- if card_product.featured_image -%}
+        <img
+          src="{{ card_product.featured_image | image_url: width: 900 }}"
+          alt="{{ card_product.featured_image.alt | default: card_product.title | escape }}"
+          width="900"
+          height="1200"
+          loading="lazy">
+      {%- else -%}
+        {{ 'product-1' | placeholder_svg_tag: 'placeholder-svg' }}
+      {%- endif -%}
+    </a>
+    <h3><a href="{{ card_product.url }}">{{ card_product.title | escape }}</a></h3>
+    {%- if card_product.type != blank -%}
+      <p class="product-meta">{{ card_product.type | escape }}</p>
+    {%- endif -%}
+    <p class="price">
+      {{ card_product.price | money }}
+      {%- unless card_product.available %} &middot; {{ 'products.product.sold_out' | t }}{% endunless -%}
+    </p>
+  {%- endif -%}
+</article>

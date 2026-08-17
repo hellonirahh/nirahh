@@ -1,0 +1,14 @@
+<section class="wrap narrow page-head">
+  <h1 class="display">{{ page.title | escape }}</h1>
+</section>
+
+<section class="wrap narrow rte" style="padding-bottom:clamp(3rem,6vw,5rem)">
+  {{ page.content }}
+</section>
+
+{% schema %}
+{
+  "name": "Page",
+  "settings": []
+}
+{% endschema %}

@@ -1,0 +1,54 @@
+<section class="wrap page-head">
+  <h1 class="display">{{ 'cart.general.title' | t }}</h1>
+</section>
+
+<section class="wrap cart-page">
+  {%- if cart.item_count == 0 -%}
+    <div class="bag-empty">
+      <p class="lead">{{ 'cart.general.empty' | t }}</p>
+      <a class="btn btn-ghost" href="{{ routes.all_products_collection_url }}">Browse the Edit</a>
+    </div>
+  {%- else -%}
+    {%- form 'cart', cart -%}
+      <div class="cart-items">
+        {%- for item in cart.items -%}
+          <article class="bag-item">
+            <a class="bag-thumb" href="{{ item.url }}">
+              {%- if item.image -%}
+                <img src="{{ item.image | image_url: width: 200 }}" alt="{{ item.title | escape }}" width="200" height="266">
+              {%- endif -%}
+            </a>
+            <div class="bag-item-copy">
+              <h3><a href="{{ item.url }}">{{ item.product.title | escape }}</a></h3>
+              {%- unless item.product.has_only_default_variant -%}
+                <p class="product-meta">{{ item.variant.title }}</p>
+              {%- endunless -%}
+              <p class="price">{{ item.final_line_price | money }}</p>
+              <label class="visually-hidden" for="qty-{{ item.index | plus: 1 }}">Quantity</label>
+              <input class="cart-qty" id="qty-{{ item.index | plus: 1 }}" type="number"
+                     name="updates[]" value="{{ item.quantity }}" min="0" inputmode="numeric">
+              <a class="bag-remove" href="{{ item.url_to_remove }}">{{ 'cart.general.remove' | t }}</a>
+            </div>
+          </article>
+        {%- endfor -%}
+      </div>
+
+      <div class="cart-foot">
+        <div class="bag-total">
+          <span>{{ 'cart.general.subtotal' | t }}</span>
+          <span>{{ cart.total_price | money }}</span>
+        </div>
+        <p class="fineprint">{{ 'cart.general.note' | t }}</p>
+        <button type="submit" name="update" class="bag-continue">Update bag</button>
+        <button type="submit" name="checkout" class="btn btn-solid bag-checkout">{{ 'cart.general.checkout' | t }}</button>
+      </div>
+    {%- endform -%}
+  {%- endif -%}
+</section>
+
+{% schema %}
+{
+  "name": "Cart",
+  "settings": []
+}
+{% endschema %}

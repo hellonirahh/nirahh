@@ -1,0 +1,59 @@
+<header class="site-header" id="siteHeader">
+  <div class="header-top">
+
+    <div class="header-left">
+      <button class="nav-toggle" aria-label="{{ 'general.menu' | t }}" aria-expanded="false" id="navToggle">
+        <span></span><span></span>
+      </button>
+      <a class="logo" href="{{ routes.root_url }}" aria-label="{{ shop.name | escape }} — home">
+        {%- if settings.logo != blank -%}
+          <img src="{{ settings.logo | image_url: width: 124 }}" alt="{{ shop.name | escape }}" width="62" height="62">
+        {%- else -%}
+          <img src="{{ 'logo-mark.png' | asset_url }}" alt="{{ shop.name | escape }}" width="62" height="62">
+        {%- endif -%}
+      </a>
+    </div>
+
+    <a class="brand" href="{{ routes.root_url }}">
+      <span class="wordmark">{{ settings.wordmark | default: shop.name }}</span>
+      <span class="brand-rule">{% render 'lotus' %}</span>
+      <span class="brand-sub">{{ settings.tagline }}</span>
+    </a>
+
+    <div class="header-actions">
+      <a class="icon-btn" href="{{ routes.search_url }}" aria-label="{{ 'general.search' | t }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      </a>
+      <a class="icon-btn" href="{{ routes.account_url }}" aria-label="{{ 'general.account' | t }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg>
+      </a>
+      <a class="icon-btn bag" href="{{ routes.cart_url }}"
+         aria-label="{{ 'layout.cart.title' | t }}, {{ 'layout.cart.items_count' | t: count: cart.item_count }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 016 0v2"/></svg>
+        <span class="bag-count{% if cart.item_count == 0 %} is-empty{% endif %}">{{ cart.item_count }}</span>
+      </a>
+    </div>
+
+  </div>
+
+  <nav class="site-nav" id="siteNav" aria-label="Primary">
+    {%- for link in section.settings.menu.links -%}
+      <a href="{{ link.url }}"{% if link.active %} aria-current="page"{% endif %}>{{ link.title }}</a>
+    {%- endfor -%}
+  </nav>
+</header>
+
+{% schema %}
+{
+  "name": "Header",
+  "settings": [
+    {
+      "type": "link_list",
+      "id": "menu",
+      "label": "Menu",
+      "default": "main-menu",
+      "info": "Edit the links themselves under Online Store → Navigation."
+    }
+  ]
+}
+{% endschema %}

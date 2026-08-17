@@ -1,0 +1,30 @@
+<section class="wrap page-head">
+  <p class="eyebrow">Shop by moment</p>
+  <h1 class="display">Find the saree for every room you walk into.</h1>
+</section>
+
+<section class="wrap">
+  <div class="moment-rail" style="grid-auto-flow:row;grid-template-columns:repeat(3,1fr)">
+    {%- for collection in collections -%}
+      <a class="moment" href="{{ collection.url }}">
+        {%- if collection.image -%}
+          <img src="{{ collection.image | image_url: width: 800 }}" alt="{{ collection.title | escape }}"
+               width="800" height="1000" loading="lazy">
+        {%- else -%}
+          {{ 'lifestyle-1' | placeholder_svg_tag: 'placeholder-svg' }}
+        {%- endif -%}
+        <div class="moment-copy">
+          <h3>{{ collection.title | escape }}</h3>
+          <span class="arrow">&rarr;</span>
+        </div>
+      </a>
+    {%- endfor -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Collections list",
+  "settings": []
+}
+{% endschema %}
