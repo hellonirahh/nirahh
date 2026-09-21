@@ -1,0 +1,42 @@
+/* Self-hosted on the Shopify CDN instead of fonts.googleapis.com — see
+   https://shopify.dev/docs/storefronts/themes/best-practices/performance/self-host-web-fonts */
+
+@font-face {
+  font-family: 'Marcellus';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('{{ "marcellus.woff2" | asset_url }}') format('woff2');
+}
+
+@font-face {
+  font-family: 'Parisienne';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('{{ "parisienne.woff2" | asset_url }}') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 300 500;
+  font-display: swap;
+  src: url('{{ "cormorant-garamond.woff2" | asset_url }}') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: italic;
+  font-weight: 300 400;
+  font-display: swap;
+  src: url('{{ "cormorant-garamond-italic.woff2" | asset_url }}') format('woff2');
+}
+
+@font-face {
+  font-family: 'Jost';
+  font-style: normal;
+  font-weight: 300 500;
+  font-display: swap;
+  src: url('{{ "jost.woff2" | asset_url }}') format('woff2');
+}
