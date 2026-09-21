@@ -124,5 +124,20 @@
         "default": "@nirahh.official"
       }
     ]
+  },
+  {
+    "name": "Contact",
+    "settings": [
+      {
+        "type": "text",
+        "id": "contact_email",
+        "label": "Support email"
+      },
+      {
+        "type": "text",
+        "id": "contact_phone",
+        "label": "Support phone"
+      }
+    ]
   }
 ]

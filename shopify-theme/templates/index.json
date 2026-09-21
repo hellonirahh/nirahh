@@ -33,38 +33,22 @@
         "subheading": "Find the saree for every room you walk into."
       },
       "blocks": {
-        "office": { "type": "moment", "settings": { "heading": "Office drapes" } },
-        "boardroom": { "type": "moment", "settings": { "heading": "Boardroom drapes" } },
-        "evening": { "type": "moment", "settings": { "heading": "Evening drapes" } },
-        "travel": { "type": "moment", "settings": { "heading": "Travel drapes" } },
-        "celebration": { "type": "moment", "settings": { "heading": "Celebration drapes" } }
+        "office": { "type": "moment", "settings": { "heading": "Office drapes", "collection": "workday-classics" } },
+        "boardroom": { "type": "moment", "settings": { "heading": "Boardroom drapes", "collection": "power-drapes" } },
+        "evening": { "type": "moment", "settings": { "heading": "Evening drapes", "collection": "evening-drapes" } },
+        "travel": { "type": "moment", "settings": { "heading": "Travel drapes", "collection": "travel" } }
       },
-      "block_order": ["office", "boardroom", "evening", "travel", "celebration"]
+      "block_order": ["office", "boardroom", "evening", "travel"]
     },
     "edit": {
       "type": "featured-edit",
       "settings": {
         "heading": "The Nirahh Edit",
         "subheading": "A small collection of sarees we'd actually wear to work, meetings and events.",
-        "count": 6,
+        "collection": "the-edit",
+        "count": 8,
         "link_label": "View all"
       }
-    },
-    "pov": {
-      "type": "point-of-view",
-      "settings": {
-        "eyebrow": "The Nirahh point of view",
-        "heading": "We don't select a saree<br>because it's trending.",
-        "intro": "We ask:",
-        "link_label": "Our curation philosophy"
-      },
-      "blocks": {
-        "q1": { "type": "question", "settings": { "text": "Would I wear this into a room where my work matters?" } },
-        "q2": { "type": "question", "settings": { "text": "Does the colour hold its own without demanding attention?" } },
-        "q3": { "type": "question", "settings": { "text": "Does the fabric move comfortably through a long day?" } },
-        "q4": { "type": "question", "settings": { "text": "Does the drape make you feel more composed?" } }
-      },
-      "block_order": ["q1", "q2", "q3", "q4"]
     },
     "tryon": {
       "type": "try-on",
@@ -79,6 +63,7 @@
       "settings": {
         "heading": "The Nirahh Note",
         "subheading": "On presence, and what we choose to wear into a room.",
+        "blog": "news",
         "count": 5,
         "link_label": "View all articles"
       }
@@ -120,5 +105,5 @@
       "block_order": ["anita", "meera", "shalini"]
     }
   },
-  "order": ["hero", "pillars", "moments", "edit", "pov", "tryon", "note", "worn"]
+  "order": ["hero", "pillars", "moments", "edit", "tryon", "note", "worn"]
 }

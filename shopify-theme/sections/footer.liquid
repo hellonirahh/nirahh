@@ -35,6 +35,17 @@
         {%- when 'signup' -%}
           <div class="footer-col footer-signup" {{ block.shopify_attributes }}>
             <h4>{{ block.settings.heading }}</h4>
+            {%- if settings.contact_email != blank or settings.contact_phone != blank -%}
+              <p class="footer-contact">
+                {%- if settings.contact_email != blank -%}
+                  <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
+                {%- endif -%}
+                {%- if settings.contact_phone != blank -%}
+                  <br>
+                  <a href="tel:{{ settings.contact_phone | remove: ' ' }}">{{ settings.contact_phone }}</a>
+                {%- endif -%}
+              </p>
+            {%- endif -%}
             {%- if block.settings.body != blank -%}
               <p class="footer-note">{{ block.settings.body }}</p>
             {%- endif -%}
