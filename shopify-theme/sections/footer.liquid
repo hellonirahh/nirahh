@@ -41,7 +41,7 @@
                   <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
                 {%- endif -%}
                 {%- if settings.contact_phone != blank -%}
-                  <br>
+                  {%- if settings.contact_email != blank -%}<br>{%- endif -%}
                   <a href="tel:{{ settings.contact_phone | remove: ' ' }}">{{ settings.contact_phone }}</a>
                 {%- endif -%}
               </p>
