@@ -67,43 +67,7 @@
         "count": 5,
         "link_label": "View all articles"
       }
-    },
-    "worn": {
-      "type": "worn-by",
-      "settings": {
-        "heading": "Worn by women who have rooms to run"
-      },
-      "blocks": {
-        "anita": {
-          "type": "testimonial",
-          "settings": {
-            "name": "Anita R.",
-            "role": "Technology Leader, Bengaluru",
-            "stars": 5,
-            "quote": "The sarees are light, elegant and perfect for long workdays. I always feel composed, never overdressed."
-          }
-        },
-        "meera": {
-          "type": "testimonial",
-          "settings": {
-            "name": "Meera S.",
-            "role": "Finance, Mumbai",
-            "stars": 5,
-            "quote": "Finally, sarees that are sophisticated and comfortable. My go-to for meetings and events."
-          }
-        },
-        "shalini": {
-          "type": "testimonial",
-          "settings": {
-            "name": "Shalini P.",
-            "role": "Consultant, Pune",
-            "stars": 5,
-            "quote": "The colours are thoughtful. They photograph well, travel well and wear even better."
-          }
-        }
-      },
-      "block_order": ["anita", "meera", "shalini"]
     }
   },
-  "order": ["hero", "pillars", "moments", "edit", "tryon", "note", "worn"]
+  "order": ["hero", "pillars", "moments", "edit", "tryon", "note"]
 }

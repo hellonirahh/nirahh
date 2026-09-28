@@ -94,7 +94,11 @@ def check_settings_schema():
 
 def check_references():
     """Assets and snippets referenced by name must exist, and be flat."""
-    have_assets = {p.name for p in (THEME / "assets").iterdir()}
+    asset_files = list((THEME / "assets").iterdir())
+    have_assets = {p.name for p in asset_files}
+    # A file like fonts.css.liquid is processed by Shopify and served at the
+    # un-suffixed name, so 'fonts.css' | asset_url is the correct reference.
+    have_assets |= {p.name[: -len(".liquid")] for p in asset_files if p.name.endswith(".liquid")}
     have_snippets = {p.stem for p in (THEME / "snippets").glob("*.liquid")}
 
     for path in sorted(THEME.rglob("*.liquid")):

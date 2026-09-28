@@ -74,10 +74,9 @@
     });
   }
 
-  // ---- See yourself in it --------------------------------------------------
-  var objectUrl = null;
-  var readTimer = null;
-
+  // ---- See yourself in it ----------------------------------------------
+  // The real render-the-saree-onto-your-photo backend isn't built yet, so
+  // this just opens a "coming soon" message rather than pretending to work.
   function initTryOn() {
     var modal = document.getElementById('tryOnModal');
     var openBtn = document.getElementById('tryOnBtn');
@@ -85,51 +84,9 @@
     if (!modal || modal.dataset.bound) return;
     modal.dataset.bound = '1';
 
-    var upload = document.getElementById('uploadInput');
-    var zone = document.getElementById('uploadZone');
-    var stepUpload = document.getElementById('stepUpload');
-    var stepPreview = document.getElementById('stepPreview');
-    var previewImg = document.getElementById('previewImg');
-    var previewTitle = document.getElementById('previewTitle');
-    var previewStatus = document.getElementById('previewStatus');
-    var previewStatusText = document.getElementById('previewStatusText');
-    var resetBtn = document.getElementById('resetBtn');
-    var doneBtn = document.getElementById('doneBtn');
-
-    function reset() {
-      if (readTimer) { clearTimeout(readTimer); readTimer = null; }
-      if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-      if (upload) upload.value = '';
-      if (previewImg) previewImg.removeAttribute('src');
-      if (stepPreview) stepPreview.hidden = true;
-      if (stepUpload) stepUpload.hidden = false;
-      if (previewStatus) previewStatus.classList.remove('done');
-    }
-
     function setModal(show) {
       modal.hidden = !show;
       document.body.style.overflow = show ? 'hidden' : '';
-      if (!show) reset();
-    }
-
-    function showPhoto(file) {
-      if (!file || !/^image\//.test(file.type)) return;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      objectUrl = URL.createObjectURL(file);
-
-      previewImg.src = objectUrl;
-      previewTitle.innerHTML = 'Reading the drape&hellip;';
-      previewStatus.classList.remove('done');
-      previewStatusText.textContent = 'Placing the Edit on you.';
-      stepUpload.hidden = true;
-      stepPreview.hidden = false;
-
-      if (readTimer) clearTimeout(readTimer);
-      readTimer = setTimeout(function () {
-        previewTitle.textContent = 'Here you are.';
-        previewStatus.classList.add('done');
-        previewStatusText.textContent = 'Sarees from the Edit, drawn to your frame.';
-      }, 1800);
     }
 
     if (openBtn) openBtn.addEventListener('click', function () { setModal(true); });
@@ -139,26 +96,8 @@
       if (e.key === 'Escape' && !modal.hidden) setModal(false);
     });
 
-    if (upload && zone && stepUpload && stepPreview) {
-      upload.addEventListener('change', function () {
-        if (upload.files && upload.files[0]) showPhoto(upload.files[0]);
-      });
-      ['dragenter', 'dragover'].forEach(function (evt) {
-        zone.addEventListener(evt, function (e) { e.preventDefault(); zone.classList.add('dragging'); });
-      });
-      ['dragleave', 'drop'].forEach(function (evt) {
-        zone.addEventListener(evt, function () { zone.classList.remove('dragging'); });
-      });
-      zone.addEventListener('drop', function (e) {
-        e.preventDefault();
-        if (e.dataTransfer && e.dataTransfer.files[0]) showPhoto(e.dataTransfer.files[0]);
-      });
-      if (resetBtn) resetBtn.addEventListener('click', reset);
-      if (doneBtn) doneBtn.addEventListener('click', function () { setModal(false); });
-    }
-
-    // A try-on link from a product page lands on the homepage anchor; open it.
-    if (location.hash === '#try-on-open') setModal(true);
+    // A try-on link from a product page lands on this homepage anchor; open it.
+    if (location.hash === '#try-on') setModal(true);
   }
 
   // The try-on modal is not on every page, but the link from a product page is.
