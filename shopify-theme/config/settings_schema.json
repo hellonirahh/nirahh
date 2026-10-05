@@ -120,8 +120,8 @@
       {
         "type": "text",
         "id": "social_handle",
-        "label": "Handle shown on the testimonials band",
-        "default": "@nirahh.official"
+        "label": "Social handle (currently unused; kept for a future section)",
+        "default": "@nirahh.in"
       }
     ]
   },

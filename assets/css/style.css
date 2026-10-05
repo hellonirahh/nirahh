@@ -166,12 +166,12 @@ button{font:inherit;cursor:pointer}
 .hero-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 20%}
 
 /* ---------- Pillars ---------- */
-.pillars-band{background:var(--sand);padding-block:clamp(.5rem,.8vw,.7rem)}
+.pillars-band{background:var(--sand);padding-block:clamp(.15rem,.25vw,.25rem)}
 .pillars{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}
-.pillar{padding:.1rem clamp(.5rem,2vw,2rem)}
+.pillar{padding:.05rem clamp(.5rem,2vw,2rem)}
 .pillar + .pillar{border-left:1px solid var(--line)}
-.pillar-icon{width:16px;height:16px;margin:0 auto .35rem;fill:none;stroke:var(--gold);stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round}
-.pillar h3{font-size:.66rem;letter-spacing:.22em;text-transform:uppercase;margin-bottom:.2rem}
+.pillar-icon{width:11px;height:11px;margin:0 auto .15rem;fill:none;stroke:var(--gold);stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round}
+.pillar h3{font-size:.66rem;letter-spacing:.22em;text-transform:uppercase;margin-bottom:.08rem}
 .pillar p{font-size:.78rem;color:var(--muted)}
 
 /* ---------- Section scaffolding ---------- */
@@ -202,7 +202,9 @@ button{font:inherit;cursor:pointer}
 .rail-next.light:hover{background:var(--ivory);color:var(--ink)}
 
 /* ---------- Moments ---------- */
-.moments{background:var(--paper)}
+/* Pulled up closer to the pillars band; the bottom padding stays at the
+   standard .section scale so the gap before The Edit is untouched. */
+.moments{background:var(--paper);padding-top:clamp(1.5rem,3vw,2.5rem)}
 .moment-rail{
   display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
   gap:clamp(.6rem,1.2vw,1rem);
@@ -491,7 +493,7 @@ button{font:inherit;cursor:pointer}
   .note-grid{grid-template-columns:repeat(2,1fr)}
   /* Keep the three pillars side by side so the first screen stays compact. */
   .pillar{padding-inline:.4rem}
-  .pillar-icon{width:14px;height:14px;margin-bottom:.25rem}
+  .pillar-icon{width:11px;height:11px;margin-bottom:.15rem}
   /* Tighter letter-spacing than the desktop heading, or "Considered drapes" —
      the longest of the three — wraps to two lines while its siblings stay put. */
   .pillar h3{font-size:.58rem;letter-spacing:.1em}
