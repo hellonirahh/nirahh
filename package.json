@@ -2,9 +2,8 @@
   "name": "nirahh-website",
   "version": "1.0.0",
   "description": "A static prototype of the Nirahh homepage and storefront, built to the positioning: **made for composure** — the saree complements the woman, never competes with her.",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test tests/*.test.mjs"
   },
   "keywords": [],
   "author": "",

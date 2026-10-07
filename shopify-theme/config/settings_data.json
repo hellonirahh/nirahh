@@ -15,6 +15,14 @@
     "social_instagram": "https://instagram.com/nirahh.in",
     "social_whatsapp": "https://wa.me/919740916004",
     "contact_email": "hello.nirahh@gmail.com",
-    "contact_phone": "+91 97409 16004"
+    "contact_phone": "+91 97409 16004",
+    "sections": {
+      "announcement-bar": {
+        "type": "announcement-bar",
+        "settings": {
+          "text": "Complimentary shipping within India on all orders above ₹5,000"
+        }
+      }
+    }
   }
 }

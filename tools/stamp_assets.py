@@ -12,7 +12,7 @@ import hashlib
 import re
 from pathlib import Path
 
-PAGES = ["index.html", "edit.html", "note.html", "story.html", "product.html"]
+PAGES = sorted(Path(".").glob("*.html"))
 REF = re.compile(r'(src|href)="(assets/[^"?]+)(\?v=[0-9a-f]+)?"')
 # The catalogue holds image paths too, and they need the same treatment.
 CATALOGUE = Path("assets/js/products.js")

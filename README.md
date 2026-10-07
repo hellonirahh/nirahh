@@ -3,6 +3,9 @@
 A static prototype of the Nirahh homepage and storefront, built to the positioning:
 **made for composure** — the saree complements the woman, never competes with her.
 
+For Shopify login, draft uploads, publishing, verification, and rollback, follow
+the [Shopify CLI runbook](SHOPIFY-CLI-RUNBOOK.md).
+
 ## Run it
 
 No build step, no dependencies.
@@ -22,6 +25,14 @@ Then open http://localhost:4321
 | `product.html` | One saree, chosen by `?saree=<handle>`; the whole collection runs through this single template |
 | `note.html` | The Nirahh Note — editorial index |
 | `story.html` | Our Story — the point of view |
+| `shipping-policy.html` | Shipping coverage, charges, delivery and tracking |
+| `return-damage-policy.html` | Returns and reporting damaged products |
+| `privacy-policy.html` | Privacy policy, last updated October 2026 |
+
+Policy copy lives in `policies/*.html`. Run `node tools/build_policy_pages.mjs`
+after editing it (or changing the shared header/footer in `story.html`), then
+`node tools/stamp_assets.mjs`. The policy fragments are also ready to paste
+into Shopify's policy HTML editors; see `SHOPIFY.md`.
 
 ## Shop
 
@@ -35,8 +46,26 @@ follows the visitor between pages. Checkout is deliberately a dead end until a
 payment provider is connected.
 
 Asset URLs carry a content hash (`?v=…`) so a browser cannot serve a stale
-image after a file is replaced. Re-run `python3 tools/stamp_assets.py` after
+image after a file is replaced. Re-run `node tools/stamp_assets.mjs` after
 changing anything under `assets/`.
+
+The static newsletter and virtual try-on are not connected to services. The
+newsletter explicitly reports that no email was saved; try-on opens a
+coming-soon message. Shopify handles newsletter subscriptions through its
+customer form.
+
+## Checks
+
+Run `npm ci`, then `npm test`. Browser tests use local Chrome on macOS when
+available; otherwise install Playwright Chromium with `npx playwright install
+chromium`, or set `CHROME_PATH` to a Chrome executable. They serve repository
+files through intercepted requests, with no local server or external network
+requests. Tests cover cart persistence and blocked storage, dialogs, mobile
+navigation, signup feedback, and the variant UI. Shopify variant tests use a
+rendered-DOM fixture; validate Liquid rendering and checkout in a store preview.
+
+`assets/js/dialog.js` is shared with `shopify-theme/assets/dialog.js`; keep both
+copies identical (the tests enforce this).
 
 ## Homepage sections
 
@@ -79,6 +108,10 @@ Defined as custom properties in `assets/css/style.css`.
 - **Motion** — slow reveals on scroll, 1.1s image scale on hover; all disabled under `prefers-reduced-motion`
 
 ## Images
+
+Shopify images are managed in the store admin. Use those uploaded images as
+the source of truth; no image enhancement or compression step is required in
+this repository. The static prototype retains its original local image assets.
 
 Everything in `assets/images/` is AI-generated placeholder art matching the art direction.
 **Replace with real Nirahh photography before launch.** The direction to brief a photographer:

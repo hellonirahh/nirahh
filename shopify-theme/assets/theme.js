@@ -15,25 +15,6 @@
     });
   }
 
-  function initNav() {
-    var toggle = document.getElementById('navToggle');
-    var nav = document.getElementById('siteNav');
-    if (!toggle || !nav || toggle.dataset.bound) return;
-    toggle.dataset.bound = '1';
-    toggle.addEventListener('click', function () {
-      var open = nav.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', String(open));
-      document.body.style.overflow = open ? 'hidden' : '';
-    });
-    nav.addEventListener('click', function (e) {
-      if (e.target.tagName === 'A') {
-        nav.classList.remove('open');
-        toggle.setAttribute('aria-expanded', 'false');
-        document.body.style.overflow = '';
-      }
-    });
-  }
-
   var observer = null;
   if ('IntersectionObserver' in window) {
     observer = new IntersectionObserver(function (entries) {
@@ -75,26 +56,47 @@
   }
 
   // ---- See yourself in it ----------------------------------------------
+  function initVariants(scope) {
+    scope.querySelectorAll('.pdp-form').forEach(function (form) {
+      var select = form.querySelector('[name="id"]');
+      if (!select || select.tagName !== 'SELECT' || select.dataset.bound) return;
+      select.dataset.bound = '1';
+      var info = form.closest('.pdp-info');
+      var button = form.querySelector('[name="add"]');
+      function update() {
+        var option = select.options[select.selectedIndex];
+        if (!option) { button.disabled = true; return; }
+        info.querySelector('[data-variant-price]').textContent = option.dataset.price;
+        var compare = info.querySelector('[data-variant-compare]');
+        compare.textContent = option.dataset.compare;
+        compare.hidden = !option.dataset.compare;
+        info.querySelector('[data-variant-stock]').textContent = option.dataset.stock;
+        button.disabled = option.dataset.available !== 'true';
+        button.textContent = button.disabled ? button.dataset.soldLabel : button.dataset.addLabel;
+        var image = form.closest('.pdp-grid').querySelector('#pdpMain');
+        if (image && option.dataset.image) {
+          image.src = option.dataset.image;
+          image.alt = option.dataset.alt;
+          form.closest('.pdp-grid').querySelectorAll('.pdp-thumb').forEach(function (thumb) {
+            thumb.classList.toggle('active', thumb.dataset.full === option.dataset.image);
+          });
+        }
+      }
+      select.addEventListener('change', update);
+      update();
+    });
+  }
+
   // The real render-the-saree-onto-your-photo backend isn't built yet, so
   // this just opens a "coming soon" message rather than pretending to work.
   function initTryOn() {
     var modal = document.getElementById('tryOnModal');
     var openBtn = document.getElementById('tryOnBtn');
-    var closeBtn = document.getElementById('modalClose');
     if (!modal || modal.dataset.bound) return;
     modal.dataset.bound = '1';
 
-    function setModal(show) {
-      modal.hidden = !show;
-      document.body.style.overflow = show ? 'hidden' : '';
-    }
-
+    var setModal = window.NirahhDialog(modal);
     if (openBtn) openBtn.addEventListener('click', function () { setModal(true); });
-    if (closeBtn) closeBtn.addEventListener('click', function () { setModal(false); });
-    modal.addEventListener('click', function (e) { if (e.target === modal) setModal(false); });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !modal.hidden) setModal(false);
-    });
 
     // A try-on link from a product page lands on this homepage anchor; open it.
     if (location.hash === '#try-on') setModal(true);
@@ -104,10 +106,11 @@
   // Sending it to the section anchor is enough; nothing to bind here.
 
   function init(scope) {
-    initNav();
+    window.NirahhNavigation();
     initRails(scope);
     initReveal(scope);
     initGallery(scope);
+    initVariants(scope);
     initTryOn();
   }
 

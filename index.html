@@ -10,13 +10,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Parisienne&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css?v=85da352c">
+<link rel="stylesheet" href="assets/css/style.css?v=b8baa998">
 </head>
 <body>
 
 <a class="skip-link" href="#main">Skip to content</a>
 
-<p class="announce">Complimentary shipping on all orders above ₹5,000</p>
+<p class="announce">Complimentary shipping within India on all orders above ₹5,000</p>
 
 <header class="site-header" id="siteHeader">
   <div class="header-top">
@@ -226,9 +226,10 @@
       <div class="tryon-copy">
         <p class="eyebrow">See yourself in it</p>
         <h2 class="display">Not sure how it<br>will look on you?</h2>
-        <p class="lead">Upload one photograph and see the Nirahh Edit on yourself — privately, before you decide.</p>
-        <button class="btn btn-solid" id="tryOnBtn">Try it on</button>
-        <p class="fineprint">Your photograph stays yours. It is never published, never shared.</p>
+        <p class="lead">We’re developing a private way to see the Nirahh Edit on yourself before you decide.</p>
+        <button class="btn btn-solid" id="tryOnBtn" aria-describedby="tryOnNotice">Try it on</button>
+        <p class="fineprint" id="tryOnNotice"><strong>Under development — virtual try-on is not available yet.</strong></p>
+        <p class="fineprint">Photo uploads are not available while this feature is under development.</p>
       </div>
       <figure class="tryon-media">
         <div class="phone">
@@ -316,26 +317,26 @@
       <a href="story.html">Our fabrics</a>
       <a href="#">Size guide</a>
       <a href="#">Care guide</a>
-      <a href="#">Shipping &amp; returns</a>
+      <a href="shipping-policy.html">Shipping Policy</a>
     </nav>
 
     <nav class="footer-col" aria-label="Help">
       <h4>Help</h4>
       <a href="#">Contact us</a>
       <a href="#">Track your order</a>
-      <a href="#">Returns &amp; exchanges</a>
-      <a href="#">Privacy policy</a>
+      <a href="return-damage-policy.html">Return &amp; Damage Policy</a>
+      <a href="privacy-policy.html">Privacy Policy</a>
       <a href="#">Terms &amp; conditions</a>
     </nav>
 
     <div class="footer-col footer-signup">
       <h4>Join the Nirahh Edit</h4>
-      <p class="footer-note">Style notes, new arrivals and curation straight to your inbox.</p>
-      <form class="signup" id="signupForm">
+      <p class="footer-note">Style notes and new arrivals. Newsletter signup opens when the store launches.</p>
+      <form class="signup" id="signupForm" onsubmit="return false">
         <input type="email" placeholder="Enter your email" aria-label="Your email" required>
         <button type="submit">Subscribe</button>
       </form>
-      <p class="signup-msg" id="signupMsg" hidden>Thank you — you're on the list.</p>
+      <p class="signup-msg" id="signupMsg" role="status" hidden>Newsletter signup is not available yet. Your email has not been saved.</p>
     </div>
   </div>
 
@@ -364,8 +365,9 @@
 
 <script src="assets/js/products.js?v=34927984"></script>
 
-<script src="assets/js/cart.js?v=e7c54917"></script>
+<script src="assets/js/dialog.js?v=dc9c432b"></script>
+<script src="assets/js/cart.js?v=ed26182d"></script>
 
-<script src="assets/js/main.js?v=7f696f04"></script>
+<script src="assets/js/main.js?v=73b1b184"></script>
 </body>
 </html>

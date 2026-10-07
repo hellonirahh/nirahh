@@ -449,9 +449,9 @@ button{font:inherit;cursor:pointer}
     position:fixed;inset:0;background:var(--ivory);flex-direction:column;
     justify-content:center;align-items:center;gap:1.6rem;font-size:.85rem;
     border-top:0;padding:0;
-    transform:translateY(-100%);transition:transform .45s cubic-bezier(.2,.7,.3,1);z-index:110;
+    visibility:hidden;transform:translateY(-100%);transition:transform .45s cubic-bezier(.2,.7,.3,1),visibility 0s linear .45s;z-index:110;
   }
-  .site-nav.open{transform:none}
+  .site-nav.open{visibility:visible;transform:none;transition:transform .45s cubic-bezier(.2,.7,.3,1),visibility 0s}
   .moment-rail{grid-auto-flow:row;grid-template-columns:repeat(2,1fr);grid-auto-columns:auto}
   .note-grid{grid-template-columns:repeat(2,1fr)}
   /* Keep the three pillars side by side so the first screen stays compact. */
@@ -585,3 +585,13 @@ button{font:inherit;cursor:pointer}
   .cart-page{grid-template-columns:1fr}
   .cart-foot{position:static}
 }
+
+/* ---------- Store policies ---------- */
+.policy-links{display:flex;flex-wrap:wrap;gap:.75rem 1.5rem;padding-bottom:1.4rem;font-size:.8rem}
+.policy-links a{text-decoration:underline;text-underline-offset:.2em}
+.policy-content{padding-bottom:clamp(3rem,6vw,5rem);line-height:1.8;overflow-wrap:anywhere}
+.policy-content h2{font-family:var(--serif);font-weight:400;font-size:clamp(1.4rem,2.4vw,2rem);line-height:1.3;margin:2rem 0 1rem}
+.policy-content p,.policy-content ul{margin-bottom:1rem}
+.policy-content ul{padding-left:1.5rem}
+.policy-content li + li{margin-top:.5rem}
+.policy-content a{text-decoration:underline;text-underline-offset:.2em}

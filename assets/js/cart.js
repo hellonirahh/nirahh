@@ -10,6 +10,8 @@
 
   var KEY = 'nirahh-bag';
   var products = window.NIRAHH_PRODUCTS || [];
+  var memory = [];
+  var storageAvailable = true;
 
   var find = function (handle) {
     for (var i = 0; i < products.length; i++) {
@@ -19,19 +21,25 @@
   };
 
   var read = function () {
+    if (!storageAvailable) return memory.slice();
     try {
       var raw = JSON.parse(localStorage.getItem(KEY));
-      return Array.isArray(raw) ? raw.filter(find) : [];
+      memory = Array.isArray(raw) ? raw.filter(function (handle, index) {
+        return find(handle) && raw.indexOf(handle) === index;
+      }) : [];
     } catch (e) {
-      return [];
+      storageAvailable = false;
     }
+    return memory.slice();
   };
 
   var write = function (handles) {
+    memory = handles.slice();
+    if (!storageAvailable) return;
     try {
       localStorage.setItem(KEY, JSON.stringify(handles));
     } catch (e) {
-      /* Private browsing can refuse writes; the bag still works for this page. */
+      storageAvailable = false;
     }
   };
 
@@ -66,7 +74,7 @@
 
   /* ---------- drawer ---------- */
 
-  var drawer, body, foot;
+  var drawer, body, foot, toggleDrawer;
 
   var build = function () {
     drawer = document.createElement('div');
@@ -86,23 +94,22 @@
     document.body.appendChild(drawer);
     body = drawer.querySelector('#bagBody');
     foot = drawer.querySelector('#bagFoot');
+    toggleDrawer = window.NirahhDialog(drawer);
 
     drawer.addEventListener('click', function (e) {
       if (e.target.hasAttribute('data-close')) setDrawer(false);
       var rm = e.target.closest('[data-remove]');
-      if (rm) Bag.remove(rm.getAttribute('data-remove'));
+      if (rm) {
+        Bag.remove(rm.getAttribute('data-remove'));
+        (drawer.querySelector('.bag-remove') || drawer.querySelector('.bag-empty a') || drawer.querySelector('.drawer-close')).focus();
+      }
     });
   };
 
   var setDrawer = function (show) {
     if (!drawer) return;
     if (show) render();
-    drawer.hidden = !show;
-    document.body.style.overflow = show ? 'hidden' : '';
-    if (show) {
-      var close = drawer.querySelector('.drawer-close');
-      if (close) close.focus();
-    }
+    toggleDrawer(show);
   };
 
   var render = function () {
@@ -135,7 +142,7 @@
 
     foot.innerHTML =
       '<div class="bag-total"><span>Subtotal</span><span>' + money(Bag.subtotal()) + '</span></div>' +
-      '<p class="fineprint">Shipping calculated at checkout. Complimentary above \u20B95,000.</p>' +
+      '<p class="fineprint">Shipping calculated at checkout. Free shipping within India on orders above \u20B95,000; \u20B999 on orders below \u20B95,000.</p>' +
       '<button class="btn btn-solid bag-checkout" id="bagCheckout">Proceed to checkout</button>' +
       '<p class="signup-msg" id="bagCheckoutMsg" hidden>Checkout connects to the payment provider once the store goes live.</p>' +
       '<button class="bag-continue" data-close>Continue shopping</button>';
@@ -205,4 +212,7 @@
   }
 
   window.NirahhBag = Bag;
+  window.addEventListener('storage', function (event) {
+    if (storageAvailable && (event.key === KEY || event.key === null)) sync();
+  });
 })();

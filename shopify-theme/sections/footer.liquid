@@ -53,6 +53,7 @@
               {%- if form.posted_successfully? -%}
                 <p class="signup-msg">Thank you — you're on the list.</p>
               {%- else -%}
+                {{ form.errors | default_errors }}
                 <input type="hidden" name="contact[tags]" value="newsletter">
                 <input type="email" name="contact[email]" placeholder="Enter your email" aria-label="Your email" required>
                 <button type="submit">Subscribe</button>
@@ -69,6 +70,19 @@
     <p>&copy; {{ 'now' | date: '%Y' }} {{ shop.name }}. {{ section.settings.locality }}</p>
     <p>{{ powered_by_link }}</p>
   </div>
+  {%- if shop.shipping_policy.body != blank or shop.refund_policy.body != blank or shop.privacy_policy.body != blank -%}
+  <nav class="wrap policy-links" aria-label="Store policies">
+    {%- if shop.shipping_policy.body != blank -%}
+      <a href="{{ shop.shipping_policy.url }}">Shipping Policy</a>
+    {%- endif -%}
+    {%- if shop.refund_policy.body != blank -%}
+      <a href="{{ shop.refund_policy.url }}">Return &amp; Damage Policy</a>
+    {%- endif -%}
+    {%- if shop.privacy_policy.body != blank -%}
+      <a href="{{ shop.privacy_policy.url }}">Privacy Policy</a>
+    {%- endif -%}
+  </nav>
+  {%- endif -%}
 </footer>
 
 {% schema %}

@@ -48,19 +48,20 @@
     {%- endif -%}
 
     <p class="pdp-price">
-      {{ variant.price | money }}
-      {%- if variant.compare_at_price > variant.price -%}
-        <s>{{ variant.compare_at_price | money }}</s>
-      {%- endif -%}
+      <span data-variant-price>{{ variant.price | money }}</span>
+      <s data-variant-compare {% unless variant.compare_at_price > variant.price %}hidden{% endunless %}>{{ variant.compare_at_price | money }}</s>
     </p>
 
-    {%- if product.available -%}
-      {%- if variant.inventory_management == 'shopify' and variant.inventory_quantity == 1 -%}
-        <p class="pdp-stock">{{ 'products.product.one_piece' | t }} &middot; {{ 'products.product.in_stock' | t }}</p>
+    <p class="pdp-stock" data-variant-stock aria-live="polite">
+      {%- if variant.available -%}
+        {%- if variant.inventory_management == 'shopify' and variant.inventory_quantity == 1 -%}
+          {{ 'products.product.one_piece' | t }} &middot;
+        {%- endif -%}
+        {{ 'products.product.in_stock' | t }}
+      {%- else -%}
+        {{ 'products.product.sold_out' | t }}
       {%- endif -%}
-    {%- else -%}
-      <p class="pdp-stock">{{ 'products.product.sold_out' | t }}</p>
-    {%- endif -%}
+    </p>
 
     {%- if product.description != blank -%}
       <div class="pdp-intro rte">{{ product.description }}</div>
@@ -75,6 +76,12 @@
           <select id="variantSelect" name="id" class="pdp-variant-select">
             {%- for v in product.variants -%}
               <option value="{{ v.id }}"
+                      data-price="{{ v.price | money | escape }}"
+                      data-compare="{% if v.compare_at_price > v.price %}{{ v.compare_at_price | money | escape }}{% endif %}"
+                      data-available="{{ v.available }}"
+                      data-stock="{% if v.available %}{% if v.inventory_management == 'shopify' and v.inventory_quantity == 1 %}{{ 'products.product.one_piece' | t | escape }} &middot; {% endif %}{{ 'products.product.in_stock' | t | escape }}{% else %}{{ 'products.product.sold_out' | t | escape }}{% endif %}"
+                      data-image="{% if v.featured_image %}{{ v.featured_image | image_url: width: 1200 }}{% endif %}"
+                      data-alt="{{ v.featured_image.alt | default: product.title | escape }}"
                       {% if v == variant %}selected{% endif %}
                       {% unless v.available %}disabled{% endunless %}>
                 {{ v.title }} &middot; {{ v.price | money }}{% unless v.available %} &middot; {{ 'products.product.sold_out' | t }}{% endunless %}
@@ -86,8 +93,10 @@
 
       <div class="pdp-actions">
         <button type="submit" name="add" class="btn btn-solid pdp-add"
-                {% unless product.available %}disabled{% endunless %}>
-          {%- if product.available -%}
+                data-add-label="{{ 'products.product.add_to_cart' | t | escape }}"
+                data-sold-label="{{ 'products.product.sold_out' | t | escape }}"
+                {% unless variant.available %}disabled{% endunless %}>
+          {%- if variant.available -%}
             {{ 'products.product.add_to_cart' | t }}
           {%- else -%}
             {{ 'products.product.sold_out' | t }}

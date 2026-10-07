@@ -8,7 +8,8 @@
       {%- if section.settings.body != blank -%}
         <p class="lead">{{ section.settings.body }}</p>
       {%- endif -%}
-      <button class="btn btn-solid" id="tryOnBtn" type="button">{{ section.settings.button_label }}</button>
+      <button class="btn btn-solid" id="tryOnBtn" type="button" aria-describedby="tryOnNotice">{{ section.settings.button_label }}</button>
+      <p class="fineprint" id="tryOnNotice"><strong>Under development — virtual try-on is not available yet.</strong></p>
       {%- if section.settings.fineprint != blank -%}
         <p class="fineprint">{{ section.settings.fineprint }}</p>
       {%- endif -%}
@@ -67,7 +68,7 @@
       "type": "textarea",
       "id": "body",
       "label": "Body",
-      "default": "Upload one photograph and see the Nirahh Edit on yourself — privately, before you decide."
+      "default": "We’re developing a private way to see the Nirahh Edit on yourself before you decide."
     },
     {
       "type": "text",
@@ -79,7 +80,7 @@
       "type": "text",
       "id": "fineprint",
       "label": "Fineprint",
-      "default": "Your photograph stays yours. It is never published, never shared."
+      "default": "Photo uploads are not available while this feature is under development."
     },
     {
       "type": "image_picker",

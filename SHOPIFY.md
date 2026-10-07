@@ -1,5 +1,10 @@
 # The Nirahh Shopify theme
 
+For terminal-based deployment, use the [Shopify CLI runbook](SHOPIFY-CLI-RUNBOOK.md).
+It covers login, preserving admin settings and images, draft uploads,
+publishing, verification, and rollback. The instructions below cover store setup
+and the alternative manual ZIP upload.
+
 `shopify-theme/` is the site rebuilt as a Shopify theme. The static site in the
 project root is untouched — this is a copy, not a replacement, so you can keep
 showing the GitHub Pages link while the store is being set up.
@@ -113,13 +118,30 @@ Shopify *section* — you can reorder them, change the headings, swap the
 photographs and hide the ones you don't want, by dragging in the theme editor.
 The colours and the wordmark are under **Theme settings**.
 
-Two things are carried over as-is: the "See yourself in it" panel still only
-shows the customer their own photograph back, exactly as it does now, and the
-Google Fonts are still loaded from Google rather than Shopify's CDN, because
-Marcellus and Parisienne are the fonts on your printed card and Shopify's font
-picker doesn't offer them.
+The “See yourself in it” panel opens a coming-soon message; virtual try-on is not implemented. Fonts are bundled in the theme assets and served through Shopify’s CDN.
 
 ---
+
+## Store policies
+
+Shopify stores policy text in the store admin, separately from theme files.
+Uploading the theme does not update the policies shown at checkout.
+In **Settings → Policies**, paste the HTML from these files into the matching
+policy editor's HTML view and save:
+
+| Policy field | Source file |
+|---|---|
+| Shipping policy | `policies/shipping-policy.html` |
+| Return and refund policy | `policies/return-damage-policy.html` |
+| Privacy policy | `policies/privacy-policy.html` |
+
+These contain the supplied October 2026 copy. The theme footer links to the
+store's saved shipping, refund and privacy policies when their contents are
+nonempty. These links use Shopify's native policy URLs so they match the
+policies used at checkout. See the [Shopify policy object documentation](https://shopify.dev/docs/api/liquid/objects/policy).
+
+The static site has corresponding standalone pages linked from every footer.
+Policy content edits do not change checkout shipping rates or service settings.
 
 ## Rebuilding the zip
 
