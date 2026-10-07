@@ -1,0 +1,8 @@
+/* One readable footer disclosure; image files are unchanged. */
+.image-disclosure{
+  margin-top:1.5rem;padding-top:1.5rem;padding-bottom:.5rem;
+  border-top:1px solid var(--line);font-size:.875rem;
+  line-height:1.65;color:var(--ink);
+}
+.image-disclosure h2{font-family:var(--sans);font-size:1rem;font-weight:500;margin-bottom:.65rem}
+.image-disclosure p{max-width:90ch;margin-bottom:.6rem}

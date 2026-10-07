@@ -113,8 +113,18 @@ Shopify images are managed in the store admin. Use those uploaded images as
 the source of truth; no image enhancement or compression step is required in
 this repository. The static prototype retains its original local image assets.
 
-Everything in `assets/images/` is AI-generated placeholder art matching the art direction.
-**Replace with real Nirahh photography before launch.** The direction to brief a photographer:
+Lifestyle imagery depicting people is AI-generated illustration. The saree
+product-listing photographs are original product photography, as confirmed by
+the store owner. A single “About our imagery” disclosure in the footer explains
+this distinction on each page; individual images have no AI labels or captions.
+
+Keep `assets/css/image-disclosure.css` and
+`shopify-theme/assets/image-disclosure.css` in sync. The footer copy is in
+`shopify-theme/snippets/image-disclosure.liquid`. Keep its language accurate
+when changing the site's imagery. The disclosure is informational and is not
+a guarantee against likeness, intellectual-property, or advertising complaints.
+
+Direction for future photography:
 
 - Subject not smiling at camera; composed, mid-thought
 - Real office and event environments, never studio-glam or bridal
