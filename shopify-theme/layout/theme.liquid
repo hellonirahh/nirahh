@@ -12,7 +12,13 @@
   {%- endif -%}
   <link rel="apple-touch-icon" href="{{ 'apple-touch-icon.png' | asset_url }}">
 
-  <title>{{ page_title }}{% if current_page != 1 %} &ndash; {{ current_page }}{% endif %}{% unless page_title contains shop.name %} &ndash; {{ shop.name }}{% endunless %}</title>
+  {%- liquid
+    assign document_title = page_title
+    if request.path contains '/policies/refund-policy'
+      assign document_title = 'Return & Damage Policy'
+    endif
+  -%}
+  <title>{{ document_title }}{% if current_page != 1 %} &ndash; {{ current_page }}{% endif %}{% unless document_title contains shop.name %} &ndash; {{ shop.name }}{% endunless %}</title>
 
   {%- if page_description -%}
     <meta name="description" content="{{ page_description | escape }}">
@@ -20,7 +26,7 @@
 
   <meta property="og:site_name" content="{{ shop.name }}">
   <meta property="og:url" content="{{ canonical_url }}">
-  <meta property="og:title" content="{{ page_title | escape }}">
+  <meta property="og:title" content="{{ document_title | escape }}">
   <meta property="og:type" content="{% if template contains 'product' %}product{% else %}website{% endif %}">
   {%- if page_description -%}
     <meta property="og:description" content="{{ page_description | escape }}">
@@ -33,7 +39,7 @@
   {%- else -%}
     <meta name="twitter:card" content="summary">
   {%- endif -%}
-  <meta name="twitter:title" content="{{ page_title | escape }}">
+  <meta name="twitter:title" content="{{ document_title | escape }}">
   {%- if page_description -%}
     <meta name="twitter:description" content="{{ page_description | escape }}">
   {%- endif -%}
@@ -41,7 +47,6 @@
   {{ 'marcellus.woff2' | asset_url | preload_tag: as: 'font', type: 'font/woff2' }}
   {{ 'fonts.css' | asset_url | stylesheet_tag }}
   {{ 'style.css' | asset_url | stylesheet_tag }}
-  {{ 'image-disclosure.css' | asset_url | stylesheet_tag }}
 
   {%- comment -%}
     The palette lives in the stylesheet as custom properties. Re-declaring it

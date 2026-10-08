@@ -1,0 +1,19 @@
+{%- liquid
+  assign policy_title = policy.title
+  if request.path contains '/policies/refund-policy'
+    assign policy_title = 'Return & Damage Policy'
+  endif
+-%}
+<header class="wrap narrow page-head">
+  <h1 class="display">{{ policy_title | escape }}</h1>
+</header>
+<article class="wrap narrow policy-content" aria-label="{{ policy_title | escape }}">
+  {{ policy.body }}
+</article>
+
+{% schema %}
+{
+  "name": "Policy",
+  "settings": []
+}
+{% endschema %}
