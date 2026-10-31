@@ -3,16 +3,18 @@
   every entry point (homepage section, product card, product page) can open
   it without navigating to a different page first. An entry point marks its
   trigger with data-tryon-open (plus data-tryon-product-gid/-variant-gid/
-  -title where it has a specific product); assets/tryon.js reads those
-  attributes into this dialog's own dataset and into #tryOnContext before
-  opening it, so the dialog always reflects the product it was opened for.
+  -title/-image where it has a specific product); assets/tryon.js reads
+  those attributes into this dialog before opening it.
 
-  settings.tryon_enabled gates which panel renders:
-  - off (default): the existing "still in the works" message, unchanged from
-    the previous per-section placeholder.
-  - on: a minimal shell naming the product. Steps 25-26 fill in the actual
-    sign-in, consent, upload and generation panels this shell leaves for them;
-    this step only proves the right entry point opens with the right product.
+  settings.tryon_enabled gates which panel set renders:
+  - off (default): the existing "still in the works" message, unchanged.
+  - on: the real session/consent/upload flow (step 25). Job creation and the
+    Ready/result panels are step 26's; reaching a validated photo_id ends
+    this step's chain with an explicit, honest "not wired up yet" notice
+    rather than a fabricated generation state.
+
+  #tryonConfig below is read once by assets/tryon.js; it carries no
+  credential, only the non-secret values Liquid already has at render time.
 {%- endcomment -%}
 <div class="modal" id="tryOnModal" hidden>
   <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
@@ -20,10 +22,60 @@
 
     <div class="modal-body">
       {%- if settings.tryon_enabled -%}
-        <p class="eyebrow">See yourself in it</p>
+        <script type="application/json" id="tryonConfig">
+          {
+            "proxyPath": {{ settings.tryon_proxy_path | json }},
+            "signedIn": {{ customer != blank | json }},
+            "loginUrl": {{ routes.account_login_url | json }},
+            "locale": {{ request.locale.iso_code | default: 'en' | json }}
+          }
+        </script>
+
         <h3 id="tryOnTitle" class="display">Fitting room</h3>
-        <p class="lead" id="tryOnContext" aria-live="polite">Preparing your preview&hellip;</p>
-        <p class="fineprint">Sign-in, photo upload and your preview open here next.</p>
+
+        <div class="tryon-saree" id="tryonSaree">
+          <img class="tryon-saree-image" id="tryonSareeImage" alt="" hidden>
+          <div class="tryon-saree-info">
+            <p class="eyebrow">See yourself in it</p>
+            <p class="lead" id="tryonSareeTitle"></p>
+          </div>
+          <button type="button" class="btn btn-ghost" id="tryonChangeSaree">Change saree</button>
+        </div>
+
+        <div class="tryon-panel" id="tryonSignin" hidden>
+          <p class="lead">Sign in to try this on — 2 attempts per session, 5 per day.</p>
+          <a class="btn btn-solid" id="tryonSigninBtn" href="{{ routes.account_login_url }}">Sign in</a>
+        </div>
+
+        <div class="tryon-panel" id="tryonPhoto" hidden>
+          <ul class="fineprint tryon-guidance">
+            <li>One consenting adult, in frame alone</li>
+            <li>Face and full body clearly visible, in natural light</li>
+            <li>Front-facing pose, arms away from the torso</li>
+          </ul>
+
+          <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" hidden>
+          <p class="lead" id="tryonPreviewCaption" hidden>This is how you'll look in this saree.</p>
+
+          <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
+          <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
+
+          <label class="tryon-consent">
+            <input type="checkbox" id="tryonConsent">
+            I confirm this photo is of myself, that I am an adult, and I allow Nirahh and its named provider to temporarily process it to generate this preview.
+          </label>
+
+          <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
+          <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
+
+          <div class="tryon-photo-actions">
+            <button type="button" class="btn btn-ghost" id="tryonChangePhoto" hidden>Choose another photo</button>
+            <button type="button" class="btn btn-solid" id="tryonGenerate" disabled>Generate</button>
+          </div>
+        </div>
+
+        <p class="fineprint" id="tryonCounters" aria-live="polite" hidden></p>
+        <p class="fineprint tryon-notice" id="tryonNotice" aria-live="polite" hidden></p>
       {%- else -%}
         <p class="eyebrow">See yourself in it</p>
         <h3 id="tryOnTitle" class="display">This feature is still in the works.</h3>

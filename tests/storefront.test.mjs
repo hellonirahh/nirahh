@@ -113,60 +113,383 @@ test('storefront browser regressions', async (t) => {
     await page.waitForFunction(() => document.body.style.overflow !== 'hidden');
   });
 
-  await t.test('Shopify try-on entry point opens the shared dialog and closes via its action link', async () => {
+  // Shopify-rendered DOM contract for the enabled fitting-room dialog
+  // (snippets/tryon-dialog.liquid's settings.tryon_enabled branch). Hand-built
+  // to match its ids/structure, following the same synthetic-contract
+  // pattern already used below for the variant-sync test, since there is no
+  // Shopify Liquid renderer available in CI.
+  function tryonDialogFixture(signedIn) {
+    const config = JSON.stringify({ proxyPath: '/apps/nirahh-tryon', signedIn, loginUrl: '/account/login', locale: 'en' });
+    return `
+      <div class="modal" id="tryOnModal" hidden><div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
+        <button class="modal-close" id="modalClose" aria-label="Close" type="button">&times;</button>
+        <div class="modal-body">
+          <script type="application/json" id="tryonConfig">${config}</script>
+          <h3 id="tryOnTitle" class="display">Fitting room</h3>
+          <div class="tryon-saree" id="tryonSaree">
+            <img class="tryon-saree-image" id="tryonSareeImage" alt="" hidden>
+            <div class="tryon-saree-info"><p class="eyebrow">See yourself in it</p><p class="lead" id="tryonSareeTitle"></p></div>
+            <button type="button" class="btn btn-ghost" id="tryonChangeSaree">Change saree</button>
+          </div>
+          <div class="tryon-panel" id="tryonSignin" hidden>
+            <p class="lead">Sign in to try this on — 2 attempts per session, 5 per day.</p>
+            <a class="btn btn-solid" id="tryonSigninBtn" href="/account/login">Sign in</a>
+          </div>
+          <div class="tryon-panel" id="tryonPhoto" hidden>
+            <ul class="fineprint tryon-guidance"><li>guidance</li></ul>
+            <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" hidden>
+            <p class="lead" id="tryonPreviewCaption" hidden>Preview</p>
+            <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
+            <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
+            <label class="tryon-consent"><input type="checkbox" id="tryonConsent"> I consent</label>
+            <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
+            <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
+            <div class="tryon-photo-actions">
+              <button type="button" class="btn btn-ghost" id="tryonChangePhoto" hidden>Choose another photo</button>
+              <button type="button" class="btn btn-solid" id="tryonGenerate" disabled>Generate</button>
+            </div>
+          </div>
+          <p class="fineprint" id="tryonCounters" aria-live="polite" hidden></p>
+          <p class="fineprint tryon-notice" id="tryonNotice" aria-live="polite" hidden></p>
+        </div>
+      </div></div>`;
+  }
+
+  // Intercepts every call under the configured app-proxy path and replies
+  // from `handlers`, keyed by the operation name after /v1/ (e.g.
+  // 'session/start'). Also stubs the signed upload URL used for the actual
+  // file POST. Returns the ordered list of {op, body} calls actually made.
+  async function mockProxy(page, handlers) {
+    const calls = [];
+    await page.route('http://nirahh.test/apps/nirahh-tryon/v1/**', async (route) => {
+      const req = route.request();
+      const op = new URL(req.url()).pathname.split('/v1/')[1];
+      const body = JSON.parse(req.postData() || '{}');
+      calls.push({ op, body });
+      const handler = handlers[op];
+      if (!handler) {
+        await route.fulfill({
+          status: 404, contentType: 'application/json',
+          body: JSON.stringify({ data: null, error: { code: 'NOT_FOUND', message: 'Not found.', retryable: false }, meta: { request_id: 'r' } })
+        });
+        return;
+      }
+      const result = await handler(body, calls.length);
+      await route.fulfill({
+        status: result.status || 200,
+        contentType: 'application/json',
+        body: JSON.stringify(result.error
+          ? { data: null, error: result.error, meta: { request_id: 'r' } }
+          : { data: result.data, error: null, meta: { request_id: 'r' } })
+      });
+    });
+    await page.route('http://nirahh.test/upload-sink', (route) => route.fulfill({ status: 201, body: '' }));
+    return calls;
+  }
+
+  // page.setContent() leaves the page on an opaque about:blank-derived
+  // origin where sessionStorage (and so addInitScript's pre-seeded values)
+  // throws SecurityError. Navigating to a served same-origin URL first, the
+  // same pattern the disabled-dialog test above already uses for
+  // theme-modal.html, gives the fixture a real http://nirahh.test origin.
+  let fixtureCount = 0;
+  async function gotoFixture(page, html) {
+    const url = `http://nirahh.test/tryon-fixture-${fixtureCount++}.html`;
+    await page.route(url, (route) => route.fulfill({ contentType: 'text/html', body: html }));
+    await page.goto(url);
+  }
+
+  const baseLimits = {
+    max_upload_bytes: 10485760, max_image_pixels: 40000000, allowed_content_types: ['image/jpeg', 'image/png', 'image/webp'],
+    max_active_jobs: 1, max_job_seconds: 180, max_generations_per_session: 2, max_paid_attempts_per_job: 1,
+    generations_reserved: 0, generations_consumed: 0, remaining_generations: 2,
+    max_generations_per_account_per_day: 5, account_generations_reserved_today: 0, account_generations_consumed_today: 0,
+    account_generations_remaining_today: 5, account_quota_resets_at: '2026-11-02T18:30:00Z', account_quota_timezone: 'Asia/Kolkata',
+    effective_remaining_generations: 2
+  };
+
+  await t.test('Shopify try-on entry point opens the shared dialog (disabled) and closes via its action link', async () => {
     const page = await newPage();
     const source = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
     const modal = source.slice(source.indexOf('<!-- Try-on modal -->'), source.indexOf('<script src='));
     await page.route('http://nirahh.test/theme-modal.html', route => route.fulfill({
       contentType: 'text/html',
-      body: `<button id="tryOnBtn" data-tryon-open data-tryon-product-gid="gid://shopify/Product/1" data-tryon-title="Test saree">Try on</button>${modal}<script src="/shopify-theme/assets/dialog.js"></script><script src="/shopify-theme/assets/theme.js"></script><script src="/shopify-theme/assets/tryon.js"></script>`
+      body: `<button id="tryOnBtn" data-tryon-open data-tryon-product-gid="gid://shopify/Product/1" data-tryon-title="Test saree">Try on</button>${modal}<script src="/shopify-theme/assets/dialog.js"></script><script src="/shopify-theme/assets/theme.js"></script><script src="/shopify-theme/assets/tryon-api.js"></script><script src="/shopify-theme/assets/tryon.js"></script>`
     }));
     await page.goto('http://nirahh.test/theme-modal.html');
     await page.locator('#tryOnBtn').click();
     assert.equal(await page.evaluate(() => document.activeElement.id), 'modalClose');
-    assert.equal(await page.evaluate(() => document.getElementById('tryOnModal').dataset.productGid), 'gid://shopify/Product/1');
     await page.locator('#tryOnModal a').click();
     assert.equal(await page.locator('#tryOnModal').isVisible(), false);
     assert.equal(await page.evaluate(() => document.body.style.overflow), '');
   });
 
-  await t.test('try-on buttons carry product context and bind once per section reload', async () => {
+  await t.test('signed-out try-on shows the sign-in panel, preserves the saree across the login redirect, and binds once', async () => {
     const page = await newPage();
-    // Shopify-rendered DOM contract: the shared dialog from layout/theme.liquid
-    // plus one entry point inside a section the theme editor can reload on its own.
-    await page.setContent(`
-      <div class="modal" id="tryOnModal" hidden><div class="modal-panel" role="dialog" aria-modal="true">
-        <button class="modal-close" id="modalClose" type="button">x</button>
-        <div class="modal-body"><p id="tryOnContext"></p></div>
-      </div></div>
+    await gotoFixture(page, `${tryonDialogFixture(false)}
       <div id="card">
         <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
-                data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Test saree">Try on</button>
+                data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>
       </div>`);
     await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
     await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
 
     await page.locator('[data-tryon-open]').click();
-    assert.equal(await page.locator('#tryOnModal').isVisible(), true);
-    assert.equal(await page.evaluate(() => document.getElementById('tryOnModal').dataset.productGid), 'gid://shopify/Product/1');
-    assert.equal(await page.evaluate(() => document.getElementById('tryOnModal').dataset.variantGid), 'gid://shopify/ProductVariant/1');
-    assert.match(await page.locator('#tryOnContext').textContent(), /Test saree/);
-    await page.locator('#modalClose').click();
+    assert.equal(await page.locator('#tryonSignin').isVisible(), true);
+    assert.equal(await page.locator('#tryonPhoto').isVisible(), false);
+    assert.equal(await page.locator('#tryonSareeTitle').textContent(), 'Rani saree');
 
-    // The theme editor can reload the card's section markup repeatedly without
-    // a page reload; re-init must never attach a second click listener.
+    // No duplicate click binding across repeated theme-editor section
+    // reloads. Done before the sign-in click below, since that one is a
+    // real <a href> and clicking it navigates the page away.
     await page.evaluate(() => {
       const dialog = document.getElementById('tryOnModal');
-      const original = dialog._nirahhSetOpen;
       window.__opens = 0;
+      const original = dialog._nirahhSetOpen;
       dialog._nirahhSetOpen = function (open) { window.__opens++; return original(open); };
-      const card = document.getElementById('card');
-      document.dispatchEvent(Object.assign(new CustomEvent('shopify:section:load', { bubbles: true }), {}));
-      card.dispatchEvent(new CustomEvent('shopify:section:load', { bubbles: true }));
-      card.dispatchEvent(new CustomEvent('shopify:section:load', { bubbles: true }));
+      document.getElementById('card').dispatchEvent(new CustomEvent('shopify:section:load', { bubbles: true }));
+      document.getElementById('card').dispatchEvent(new CustomEvent('shopify:section:load', { bubbles: true }));
     });
+    await page.locator('#modalClose').click();
     await page.locator('[data-tryon-open]').click();
     assert.equal(await page.evaluate(() => window.__opens), 1);
+
+    // The sign-in link is a real <a href>, so clicking it navigates the page
+    // away once its default action runs; capture both the rewritten href and
+    // the storage write from inside the very click handler that sets them,
+    // before that navigation can tear down this document.
+    await page.route('http://nirahh.test/account/login*', (route) => route.fulfill({ contentType: 'text/html', body: '<p>login stub</p>' }));
+    const [href, pending] = await page.evaluate(() => new Promise((resolve) => {
+      const btn = document.getElementById('tryonSigninBtn');
+      btn.addEventListener('click', () => {
+        resolve([btn.getAttribute('href'), sessionStorage.getItem('nirahh_tryon_pending_product')]);
+      }, { once: true });
+      btn.click();
+    }));
+    assert.match(href, /return_url=/);
+    assert.match(pending, /Rani saree/);
+  });
+
+  await t.test('returning signed-in after the login redirect auto-reopens the dialog for the preserved saree', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => {
+      sessionStorage.setItem('nirahh_tryon_pending_product', JSON.stringify({
+        productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/1', title: 'Rani saree', image: ''
+      }));
+    });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    await mockProxy(page, {
+      'session/start': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, session_token: '1'.repeat(43) } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.waitForFunction(() => document.getElementById('tryOnModal') && !document.getElementById('tryOnModal').hidden);
+    assert.equal(await page.locator('#tryonSareeTitle').textContent(), 'Rani saree');
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('nirahh_tryon_pending_product')), null);
+  });
+
+  await t.test('signed-in try-on resumes an existing session, never uploads before consent, and surfaces allowance counters', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => {
+      sessionStorage.setItem('nirahh_tryon_session_token', '2'.repeat(43));
+    });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    assert.equal(calls[0].op, 'session/resume');
+    assert.equal(calls[0].body.session_token, '2'.repeat(43));
+    assert.equal(await page.locator('#tryonCounters').textContent(), '2 attempts left this session · 5 left today');
+
+    // Choosing a file alone, without checking consent, must not enable
+    // Generate or reach the server: a photo never reaches the server before
+    // consent is explicitly given.
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    assert.equal(await page.locator('#tryonGenerate').isDisabled(), true);
+    assert.equal(calls.some((c) => c.op === 'uploads/prepare'), false);
+
+    await page.locator('#tryonConsent').check();
+    assert.equal(await page.locator('#tryonGenerate').isDisabled(), false);
+  });
+
+  await t.test('generate uploads only after consent, polls validation, and reports a rejection with the exact PRD wording', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', '3'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    let statusCalls = 0;
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'uploads/prepare': () => ({ data: { upload_id: 'u1', method: 'POST', upload_url: 'http://nirahh.test/upload-sink', fields: { key: 'k', policy: 'p', signature: 'sig' }, expires_at: '2026-11-01T01:05:00Z', max_bytes: 10485760 } }),
+      'uploads/complete': () => ({ data: { upload_id: 'u1', status: 'validating', poll_after_ms: 1000 } }),
+      'uploads/status': () => {
+        statusCalls++;
+        if (statusCalls < 2) return { data: { upload_id: 'u1', status: 'validating', poll_after_ms: 50 } };
+        return { data: { upload_id: 'u1', status: 'rejected', reason: 'PHOTO_UNSUITABLE' } };
+      }
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonConsent').check();
+    await page.locator('#tryonGenerate').click();
+
+    await page.waitForFunction(() => !document.getElementById('tryonNotice').hidden, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonNotice').textContent(), "We couldn't use that photo. Make sure your face and full body are clearly visible in good light.");
+    // The prepare call only happens once consent was checked, and carries
+    // the session's own consent_version rather than a client-invented one.
+    const prepareCall = calls.find((c) => c.op === 'uploads/prepare');
+    assert.equal(prepareCall.body.consent_version, 'v1');
+    assert.equal(prepareCall.body.accepted_self_adult_processing, true);
+    // A rejection clears the file input and preview rather than leaving a
+    // stale selection the shopper could resubmit unchanged.
+    assert.equal(await page.locator('#tryonPreview').isVisible(), false);
+  });
+
+  await t.test('a photo that passes validation stops at the step-25 boundary without fabricating a generation state', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', '4'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'uploads/prepare': () => ({ data: { upload_id: 'u2', method: 'POST', upload_url: 'http://nirahh.test/upload-sink', fields: { key: 'k' }, expires_at: '2026-11-01T01:05:00Z', max_bytes: 10485760 } }),
+      'uploads/complete': () => ({ data: { upload_id: 'u2', status: 'validating', poll_after_ms: 1000 } }),
+      'uploads/status': () => ({ data: { upload_id: 'u2', status: 'ready', photo_id: 'p1' } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonConsent').check();
+    await page.locator('#tryonGenerate').click();
+
+    await page.waitForFunction(() => !document.getElementById('tryonNotice').hidden, null, { timeout: 5000 });
+    assert.match(await page.locator('#tryonNotice').textContent(), /ready/);
+    assert.equal(await page.locator('#tryonGenerate').isDisabled(), false);
+  });
+
+  await t.test('a network failure during upload shows the generic safe notice and lets the shopper retry', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', '5'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'uploads/prepare': () => ({ status: 503, error: { code: 'SERVICE_UNAVAILABLE', message: 'Something went wrong. Please try again.', retryable: true } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonConsent').check();
+    await page.locator('#tryonGenerate').click();
+
+    await page.waitForFunction(() => !document.getElementById('tryonNotice').hidden, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonNotice').textContent(), 'Something went wrong. Please try again.');
+    assert.equal(await page.locator('#tryonGenerate').isDisabled(), false);
+  });
+
+  await t.test('an ineligible product closes the dialog quietly instead of showing an undesigned error', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', '6'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/9"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/9" data-tryon-title="Unavailable saree">Try on</button>`);
+    await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/9', variant_gid: 'gid://shopify/ProductVariant/9', eligible: false, reason: 'not_in_rollout' }] } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => document.getElementById('tryOnModal').hidden, null, { timeout: 5000 });
+  });
+
+  await t.test('resume rejecting a stale or foreign session token starts fresh rather than showing a previous account', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => {
+      sessionStorage.setItem('nirahh_tryon_session_token', '7'.repeat(43));
+      sessionStorage.setItem('nirahh_tryon_session_id', 'stale-session');
+    });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ status: 401, error: { code: 'SESSION_INVALID', message: 'Invalid session.', retryable: false } }),
+      'session/start': () => ({ data: { session_id: 'fresh-session', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, session_token: '8'.repeat(43) } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    assert.deepEqual(calls.map((c) => c.op), ['session/resume', 'session/start', 'session/activity', 'products/eligibility']);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('nirahh_tryon_session_token')), '8'.repeat(43));
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('nirahh_tryon_session_id')), 'fresh-session');
+  });
+
+  await t.test('sessionStorage never holds anything beyond the opaque session token and id', async () => {
+    const page = await newPage();
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    await mockProxy(page, {
+      'session/start': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, session_token: '9'.repeat(43) } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    const stored = await page.evaluate(() => Object.assign({}, sessionStorage));
+    assert.deepEqual(Object.keys(stored).sort(), ['nirahh_tryon_session_id', 'nirahh_tryon_session_token']);
+    assert.equal(stored.nirahh_tryon_session_token, '9'.repeat(43));
+    assert.doesNotMatch(JSON.stringify(stored), /base64|data:image/);
   });
 
   await t.test('prototype signup never claims to save an email', async () => {

@@ -19,3 +19,88 @@
 .product-try:hover {
   color: var(--ink);
 }
+
+/* Fitting-room dialog panels (step 25): session, consent and upload. */
+.tryon-saree {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin: .75rem 0 1rem;
+}
+.tryon-saree-image {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: none;
+}
+.tryon-saree-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tryon-saree-info .eyebrow {
+  margin: 0 0 .15rem;
+}
+.tryon-saree-info .lead {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tryon-guidance {
+  margin: 0 0 1rem;
+  padding-left: 1.1rem;
+}
+.tryon-guidance li {
+  margin-bottom: .25rem;
+}
+
+.tryon-preview {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 4px;
+  margin-bottom: .5rem;
+  background: var(--sand);
+}
+
+.tryon-file-label {
+  display: block;
+  font-size: .62rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: .35rem;
+}
+
+.tryon-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  font-size: .85rem;
+  line-height: 1.4;
+  color: var(--muted);
+  margin: .75rem 0;
+}
+.tryon-consent input {
+  margin-top: .2rem;
+  flex: none;
+}
+
+.tryon-progress {
+  width: 100%;
+  margin: .5rem 0;
+}
+
+.tryon-photo-actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-top: .5rem;
+}
+
+.tryon-notice {
+  color: var(--ink);
+}

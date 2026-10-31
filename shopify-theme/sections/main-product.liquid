@@ -106,7 +106,8 @@
           <button type="button" class="btn btn-ghost pdp-try" data-tryon-open
                   data-tryon-product-gid="gid://shopify/Product/{{ product.id }}"
                   data-tryon-variant-gid="gid://shopify/ProductVariant/{{ variant.id }}"
-                  data-tryon-title="{{ product.title | escape }}">
+                  data-tryon-title="{{ product.title | escape }}"
+                  {%- if product.featured_image %} data-tryon-image="{{ product.featured_image | image_url: width: 200 }}"{% endif %}>
             {{ 'products.product.try_on' | t }}
           </button>
         {%- endif -%}
