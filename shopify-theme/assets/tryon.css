@@ -104,3 +104,26 @@
 .tryon-notice {
   color: var(--ink);
 }
+
+/* Reusing an already-validated photo for a second saree (step 26): skips
+   the file input/consent entirely rather than hiding it visually only. */
+.tryon-reuse {
+  margin-bottom: 1rem;
+}
+.tryon-reuse .lead {
+  margin: 0 0 .5rem;
+}
+
+/* Create (queued/creating/checking) and Ready panels (step 26). */
+.tryon-result {
+  background: var(--sand);
+}
+.tryon-compare {
+  display: flex;
+  gap: .5rem;
+  margin: .5rem 0;
+}
+.tryon-compare .btn[aria-pressed="true"] {
+  color: var(--ink);
+  border-color: currentColor;
+}

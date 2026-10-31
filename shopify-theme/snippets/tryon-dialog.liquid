@@ -8,10 +8,17 @@
 
   settings.tryon_enabled gates which panel set renders:
   - off (default): the existing "still in the works" message, unchanged.
-  - on: the real session/consent/upload flow (step 25). Job creation and the
-    Ready/result panels are step 26's; reaching a validated photo_id ends
-    this step's chain with an explicit, honest "not wired up yet" notice
-    rather than a fabricated generation state.
+  - on: the real session/consent/upload flow (step 25) plus job creation,
+    polling, comparison, download, retry, cancellation and deletion
+    (step 26). #tryonPhoto covers Select/Review photo and either the normal
+    upload fields (#tryonUploadFields) or, when the session already has a
+    validated photo, the reuse view (#tryonReuse) that skips straight to
+    Generate without a second upload. #tryonCreate covers queued/creating/
+    checking and, in the same panel, a job failure/quality-rejection/
+    outcome-unknown notice with its own Try again action. #tryonReady covers
+    the finished preview, Original/Preview comparison, Download, Try another
+    saree and Delete. #tryonExpired covers session expiry or an explicit
+    deletion.
 
   #tryonConfig below is read once by assets/tryon.js; it carries no
   credential, only the non-secret values Liquid already has at render time.
@@ -48,30 +55,66 @@
         </div>
 
         <div class="tryon-panel" id="tryonPhoto" hidden>
-          <ul class="fineprint tryon-guidance">
-            <li>One consenting adult, in frame alone</li>
-            <li>Face and full body clearly visible, in natural light</li>
-            <li>Front-facing pose, arms away from the torso</li>
-          </ul>
+          <div class="tryon-reuse" id="tryonReuse" hidden>
+            <p class="lead">Using your photo from this session.</p>
+            <button type="button" class="btn btn-ghost" id="tryonUseDifferentPhoto">Use a different photo</button>
+          </div>
 
-          <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" hidden>
-          <p class="lead" id="tryonPreviewCaption" hidden>This is how you'll look in this saree.</p>
+          <div id="tryonUploadFields">
+            <ul class="fineprint tryon-guidance">
+              <li>One consenting adult, in frame alone</li>
+              <li>Face and full body clearly visible, in natural light</li>
+              <li>Front-facing pose, arms away from the torso</li>
+            </ul>
 
-          <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
-          <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
+            <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" hidden>
+            <p class="lead" id="tryonPreviewCaption" hidden>This is how you'll look in this saree.</p>
 
-          <label class="tryon-consent">
-            <input type="checkbox" id="tryonConsent">
-            I confirm this photo is of myself, that I am an adult, and I allow Nirahh and its named provider to temporarily process it to generate this preview.
-          </label>
+            <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
+            <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
 
-          <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
-          <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
+            <label class="tryon-consent">
+              <input type="checkbox" id="tryonConsent">
+              I confirm this photo is of myself, that I am an adult, and I allow Nirahh and its named provider to temporarily process it to generate this preview.
+            </label>
+
+            <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
+            <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
+          </div>
 
           <div class="tryon-photo-actions">
             <button type="button" class="btn btn-ghost" id="tryonChangePhoto" hidden>Choose another photo</button>
             <button type="button" class="btn btn-solid" id="tryonGenerate" disabled>Generate</button>
           </div>
+        </div>
+
+        <div class="tryon-panel" id="tryonCreate" hidden>
+          <p class="fineprint" id="tryonCreateStage" aria-live="polite"></p>
+          <div class="tryon-photo-actions">
+            <button type="button" class="btn btn-ghost" id="tryonCancelJob">Cancel</button>
+            <button type="button" class="btn btn-ghost" id="tryonContinueShopping">Continue shopping</button>
+            <button type="button" class="btn btn-solid" id="tryonTryAgain" hidden>Try again</button>
+          </div>
+        </div>
+
+        <div class="tryon-panel" id="tryonReady" hidden>
+          <p class="lead">Here's your AI styling preview.</p>
+          <img class="tryon-preview tryon-result" id="tryonResultImg" alt="">
+          <div class="tryon-compare" role="group" aria-label="Compare your photo and the preview">
+            <button type="button" class="btn btn-ghost" id="tryonToggleOriginal" aria-pressed="false">Original</button>
+            <button type="button" class="btn btn-ghost" id="tryonTogglePreview" aria-pressed="true">Preview</button>
+          </div>
+          <p class="fineprint" id="tryonBlouseNote">Blouse styling shown is a suggestion; it's included only if the product description says so.</p>
+          <div class="tryon-photo-actions">
+            <button type="button" class="btn btn-ghost" id="tryonTryAnother">Try another saree</button>
+            <button type="button" class="btn btn-ghost" id="tryonDownload">Download</button>
+            <button type="button" class="btn btn-ghost" id="tryonDelete">Delete</button>
+          </div>
+        </div>
+
+        <div class="tryon-panel" id="tryonExpired" hidden>
+          <p class="lead">This session has ended.</p>
+          <button type="button" class="btn btn-solid" id="tryonStartNew">Start a new session</button>
         </div>
 
         <p class="fineprint" id="tryonCounters" aria-live="polite" hidden></p>

@@ -136,18 +136,50 @@ test('storefront browser regressions', async (t) => {
             <a class="btn btn-solid" id="tryonSigninBtn" href="/account/login">Sign in</a>
           </div>
           <div class="tryon-panel" id="tryonPhoto" hidden>
-            <ul class="fineprint tryon-guidance"><li>guidance</li></ul>
-            <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" hidden>
-            <p class="lead" id="tryonPreviewCaption" hidden>Preview</p>
-            <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
-            <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
-            <label class="tryon-consent"><input type="checkbox" id="tryonConsent"> I consent</label>
-            <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
-            <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
+            <div class="tryon-reuse" id="tryonReuse" hidden>
+              <p class="lead">Using your photo from this session.</p>
+              <button type="button" class="btn btn-ghost" id="tryonUseDifferentPhoto">Use a different photo</button>
+            </div>
+            <div id="tryonUploadFields">
+              <ul class="fineprint tryon-guidance"><li>guidance</li></ul>
+              <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" hidden>
+              <p class="lead" id="tryonPreviewCaption" hidden>Preview</p>
+              <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
+              <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
+              <label class="tryon-consent"><input type="checkbox" id="tryonConsent"> I consent</label>
+              <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
+              <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
+            </div>
             <div class="tryon-photo-actions">
               <button type="button" class="btn btn-ghost" id="tryonChangePhoto" hidden>Choose another photo</button>
               <button type="button" class="btn btn-solid" id="tryonGenerate" disabled>Generate</button>
             </div>
+          </div>
+          <div class="tryon-panel" id="tryonCreate" hidden>
+            <p class="fineprint" id="tryonCreateStage" aria-live="polite"></p>
+            <div class="tryon-photo-actions">
+              <button type="button" class="btn btn-ghost" id="tryonCancelJob">Cancel</button>
+              <button type="button" class="btn btn-ghost" id="tryonContinueShopping">Continue shopping</button>
+              <button type="button" class="btn btn-solid" id="tryonTryAgain" hidden>Try again</button>
+            </div>
+          </div>
+          <div class="tryon-panel" id="tryonReady" hidden>
+            <p class="lead">Here's your AI styling preview.</p>
+            <img class="tryon-preview tryon-result" id="tryonResultImg" alt="">
+            <div class="tryon-compare" role="group" aria-label="Compare your photo and the preview">
+              <button type="button" class="btn btn-ghost" id="tryonToggleOriginal" aria-pressed="false">Original</button>
+              <button type="button" class="btn btn-ghost" id="tryonTogglePreview" aria-pressed="true">Preview</button>
+            </div>
+            <p class="fineprint" id="tryonBlouseNote">Blouse note</p>
+            <div class="tryon-photo-actions">
+              <button type="button" class="btn btn-ghost" id="tryonTryAnother">Try another saree</button>
+              <button type="button" class="btn btn-ghost" id="tryonDownload">Download</button>
+              <button type="button" class="btn btn-ghost" id="tryonDelete">Delete</button>
+            </div>
+          </div>
+          <div class="tryon-panel" id="tryonExpired" hidden>
+            <p class="lead">This session has ended.</p>
+            <button type="button" class="btn btn-solid" id="tryonStartNew">Start a new session</button>
           </div>
           <p class="fineprint" id="tryonCounters" aria-live="polite" hidden></p>
           <p class="fineprint tryon-notice" id="tryonNotice" aria-live="polite" hidden></p>
@@ -370,19 +402,21 @@ test('storefront browser regressions', async (t) => {
     assert.equal(await page.locator('#tryonPreview').isVisible(), false);
   });
 
-  await t.test('a photo that passes validation stops at the step-25 boundary without fabricating a generation state', async () => {
+  await t.test('a photo that passes validation proceeds straight into job creation (step 26) instead of stopping at a stub', async () => {
     const page = await newPage();
     await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', '4'.repeat(43)); });
     await gotoFixture(page, `${tryonDialogFixture(true)}
       <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
               data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
-    await mockProxy(page, {
+    const calls = await mockProxy(page, {
       'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
       'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
       'session/activity': () => ({ data: {} }),
       'uploads/prepare': () => ({ data: { upload_id: 'u2', method: 'POST', upload_url: 'http://nirahh.test/upload-sink', fields: { key: 'k' }, expires_at: '2026-11-01T01:05:00Z', max_bytes: 10485760 } }),
       'uploads/complete': () => ({ data: { upload_id: 'u2', status: 'validating', poll_after_ms: 1000 } }),
-      'uploads/status': () => ({ data: { upload_id: 'u2', status: 'ready', photo_id: 'p1' } })
+      'uploads/status': () => ({ data: { upload_id: 'u2', status: 'ready', photo_id: 'p1' } }),
+      'jobs': () => ({ data: { job_id: 'j2', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => ({ data: { job_id: 'j2', status: 'processing', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', deadline_at: '2026-11-01T01:03:00Z', stage: 'creating', retry_allowed: false, poll_after_ms: 60000, limits: baseLimits } })
     });
     await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
     await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
@@ -394,9 +428,9 @@ test('storefront browser regressions', async (t) => {
     await page.locator('#tryonConsent').check();
     await page.locator('#tryonGenerate').click();
 
-    await page.waitForFunction(() => !document.getElementById('tryonNotice').hidden, null, { timeout: 5000 });
-    assert.match(await page.locator('#tryonNotice').textContent(), /ready/);
-    assert.equal(await page.locator('#tryonGenerate').isDisabled(), false);
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+    assert.equal(calls.find((c) => c.op === 'jobs').body.photo_id, 'p1');
+    await page.waitForFunction(() => document.getElementById('tryonCreateStage').textContent === 'Creating your preview\u2026', null, { timeout: 5000 });
   });
 
   await t.test('a network failure during upload shows the generic safe notice and lets the shopper retry', async () => {
@@ -490,6 +524,280 @@ test('storefront browser regressions', async (t) => {
     assert.deepEqual(Object.keys(stored).sort(), ['nirahh_tryon_session_id', 'nirahh_tryon_session_token']);
     assert.equal(stored.nirahh_tryon_session_token, '9'.repeat(43));
     assert.doesNotMatch(JSON.stringify(stored), /base64|data:image/);
+  });
+
+  await t.test('double-clicking Generate creates exactly one job', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'a'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'uploads/prepare': () => ({ data: { upload_id: 'u1', method: 'POST', upload_url: 'http://nirahh.test/upload-sink', fields: { key: 'k' }, expires_at: '2026-11-01T01:05:00Z', max_bytes: 10485760 } }),
+      'uploads/complete': () => ({ data: { upload_id: 'u1', status: 'validating', poll_after_ms: 1000 } }),
+      'uploads/status': () => ({ data: { upload_id: 'u1', status: 'ready', photo_id: 'p1' } }),
+      'jobs': () => ({ data: { job_id: 'j1', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => ({
+        data: {
+          job_id: 'j1', status: 'ready', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1',
+          deadline_at: '2026-11-01T01:03:00Z', stage: 'complete', retry_allowed: false, limits: baseLimits,
+          original: { url: 'http://nirahh.test/original.jpg', url_expires_at: '2026-11-01T01:01:00Z', width: 10, height: 10, content_type: 'image/jpeg' },
+          result: { result_url: 'http://nirahh.test/result.jpg', url_expires_at: '2026-11-01T01:01:00Z', width: 10, height: 10, content_type: 'image/jpeg', label: 'AI styling preview' }
+        }
+      })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonConsent').check();
+
+    // Two click() calls on the same tick: the handler disables the button
+    // synchronously on its very first line, so a real double-click (or a
+    // slow first response) cannot submit the job twice.
+    await page.evaluate(() => { const btn = document.getElementById('tryonGenerate'); btn.click(); btn.click(); });
+
+    await page.waitForFunction(() => !document.getElementById('tryonReady').hidden, null, { timeout: 5000 });
+    assert.equal(calls.filter((c) => c.op === 'jobs').length, 1);
+    assert.equal(await page.locator('#tryonResultImg').getAttribute('src'), 'http://nirahh.test/result.jpg');
+  });
+
+  await t.test('dismissing the dialog keeps the job recoverable without re-uploading or re-creating it', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'b'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    let resumeCalls = 0;
+    const calls = await mockProxy(page, {
+      'session/resume': () => {
+        resumeCalls++;
+        const jobs = resumeCalls === 1 ? [] : [{ job_id: 'j1', status: 'processing', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', deadline_at: '2026-11-01T01:03:00Z' }];
+        return { data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs } };
+      },
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'uploads/prepare': () => ({ data: { upload_id: 'u1', method: 'POST', upload_url: 'http://nirahh.test/upload-sink', fields: { key: 'k' }, expires_at: '2026-11-01T01:05:00Z', max_bytes: 10485760 } }),
+      'uploads/complete': () => ({ data: { upload_id: 'u1', status: 'validating', poll_after_ms: 1000 } }),
+      'uploads/status': () => ({ data: { upload_id: 'u1', status: 'ready', photo_id: 'p1' } }),
+      'jobs': () => ({ data: { job_id: 'j1', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => ({
+        data: {
+          job_id: 'j1', status: 'processing', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1',
+          deadline_at: '2026-11-01T01:03:00Z', stage: 'creating', retry_allowed: false, poll_after_ms: 60000, limits: baseLimits
+        }
+      })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonConsent').check();
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+    assert.equal(calls.filter((c) => c.op === 'jobs').length, 1);
+
+    // Escape pauses client polling only; it must not cancel the server job.
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#tryOnModal').isVisible(), false);
+    assert.equal(calls.some((c) => c.op === 'jobs/cancel'), false);
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+    assert.equal(calls.filter((c) => c.op === 'uploads/prepare').length, 1);
+    assert.equal(calls.filter((c) => c.op === 'jobs').length, 1);
+    assert.ok(calls.filter((c) => c.op === 'jobs/status').length >= 2);
+  });
+
+  await t.test('selecting a second saree reuses the already-validated photo without a new upload', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'c'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button id="btnA" data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on A</button>
+      <button id="btnB" data-tryon-open data-tryon-product-gid="gid://shopify/Product/2"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/2" data-tryon-title="Peacock saree">Try on B</button>`);
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [{ photo_id: 'p1', width: 10, height: 10, expires_at: '2026-11-01T03:00:00Z' }], jobs: [] } }),
+      'products/eligibility': (body) => ({ data: { items: body.items.map((i) => ({ product_gid: i.product_gid, variant_gid: i.variant_gid, eligible: true, reason: 'approved' })) } }),
+      'session/activity': () => ({ data: {} }),
+      'jobs': (body) => ({ data: { job_id: 'job-for-' + body.product_gid, status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': (body) => ({
+        data: {
+          job_id: body.job_id, status: 'processing',
+          product_gid: body.job_id.replace('job-for-', ''), variant_gid: body.job_id.indexOf('Product/1') !== -1 ? 'gid://shopify/ProductVariant/1' : 'gid://shopify/ProductVariant/2',
+          deadline_at: '2026-11-01T01:03:00Z', stage: 'creating', retry_allowed: false, poll_after_ms: 60000, limits: baseLimits
+        }
+      })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('#btnA').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReuse').hidden, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonGenerate').isDisabled(), false);
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+
+    await page.keyboard.press('Escape');
+    await page.locator('#btnB').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReuse').hidden, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonGenerate').isDisabled(), false);
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+
+    assert.equal(calls.some((c) => c.op === 'uploads/prepare'), false);
+    const jobCalls = calls.filter((c) => c.op === 'jobs');
+    assert.equal(jobCalls.length, 2);
+    assert.equal(jobCalls[0].body.photo_id, 'p1');
+    assert.equal(jobCalls[1].body.photo_id, 'p1');
+    assert.equal(jobCalls[0].body.product_gid, 'gid://shopify/Product/1');
+    assert.equal(jobCalls[1].body.product_gid, 'gid://shopify/Product/2');
+  });
+
+  await t.test('a ready result supports Original/Preview comparison, a freshly authorized Download, and Delete ends the session', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'd'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    let statusCalls = 0;
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [{ photo_id: 'p1', width: 10, height: 10, expires_at: '2026-11-01T03:00:00Z' }], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'jobs': () => ({ data: { job_id: 'j1', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => {
+        statusCalls++;
+        return {
+          data: {
+            job_id: 'j1', status: 'ready', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1',
+            deadline_at: '2026-11-01T01:03:00Z', stage: 'complete', retry_allowed: false, limits: baseLimits,
+            original: { url: 'http://nirahh.test/original-' + statusCalls + '.jpg', url_expires_at: '2026-11-01T01:01:00Z', width: 10, height: 10, content_type: 'image/jpeg' },
+            result: { result_url: 'http://nirahh.test/result-' + statusCalls + '.jpg', url_expires_at: '2026-11-01T01:01:00Z', width: 10, height: 10, content_type: 'image/jpeg', label: 'AI styling preview' }
+          }
+        };
+      },
+      'session/delete': () => ({ data: { deletion_id: 'del1', status: 'revoked', receipt_expires_at: '2026-11-02T01:00:00Z' } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReuse').hidden, null, { timeout: 5000 });
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReady').hidden, null, { timeout: 5000 });
+
+    assert.equal(await page.locator('#tryonResultImg').getAttribute('src'), 'http://nirahh.test/result-1.jpg');
+    await page.locator('#tryonToggleOriginal').click();
+    assert.equal(await page.locator('#tryonResultImg').getAttribute('src'), 'http://nirahh.test/original-1.jpg');
+    assert.equal(await page.locator('#tryonToggleOriginal').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('#tryonTogglePreview').getAttribute('aria-pressed'), 'false');
+    await page.locator('#tryonTogglePreview').click();
+    assert.equal(await page.locator('#tryonResultImg').getAttribute('src'), 'http://nirahh.test/result-1.jpg');
+
+    // Download re-reads status for a fresh signed URL through an authorized
+    // read rather than reusing the one already on screen, since signed
+    // links are valid only 60 seconds.
+    const downloadHref = await page.evaluate(() => new Promise((resolve) => {
+      const original = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        HTMLAnchorElement.prototype.click = original;
+        resolve(this.href);
+      };
+      document.getElementById('tryonDownload').click();
+    }));
+    assert.equal(downloadHref, 'http://nirahh.test/result-2.jpg');
+
+    await page.locator('#tryonDelete').click();
+    await page.waitForFunction(() => !document.getElementById('tryonExpired').hidden, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonResultImg').getAttribute('src'), null);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('nirahh_tryon_session_token')), null);
+  });
+
+  await t.test('Cancel releases the reservation for a fresh attempt; Continue shopping leaves the job running server-side', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'e'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    let resumeCalls = 0;
+    const reservedLimits = Object.assign({}, baseLimits, { generations_reserved: 1, remaining_generations: 1 });
+    const calls = await mockProxy(page, {
+      'session/resume': () => {
+        resumeCalls++;
+        const jobs = resumeCalls === 1 ? [] : [{ job_id: 'j1', status: 'processing', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', deadline_at: '2026-11-01T01:03:00Z' }];
+        return { data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [{ photo_id: 'p1', width: 10, height: 10, expires_at: '2026-11-01T03:00:00Z' }], jobs } };
+      },
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'jobs': () => ({ data: { job_id: 'j1', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: reservedLimits } }),
+      'jobs/status': () => ({ data: { job_id: 'j1', status: 'processing', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', deadline_at: '2026-11-01T01:03:00Z', stage: 'creating', retry_allowed: false, poll_after_ms: 60000, limits: reservedLimits } }),
+      'jobs/cancel': () => ({ data: { job_id: 'j1', status: 'cancelled', limits: baseLimits } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReuse').hidden, null, { timeout: 5000 });
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+    // Wait for the createJob/jobStatus round trip (not just the panel swap,
+    // which happens synchronously before the response arrives) before
+    // reading server-refreshed counters.
+    await page.waitForFunction(() => document.getElementById('tryonCreateStage').textContent === 'Creating your preview\u2026', null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonCounters').textContent(), '1 attempt left this session \u00b7 5 left today');
+
+    await page.locator('#tryonContinueShopping').click();
+    assert.equal(await page.locator('#tryOnModal').isVisible(), false);
+    assert.equal(calls.some((c) => c.op === 'jobs/cancel'), false);
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+    await page.locator('#tryonCancelJob').click();
+    await page.waitForFunction(() => !document.getElementById('tryonPhoto').hidden, null, { timeout: 5000 });
+    assert.equal(calls.filter((c) => c.op === 'jobs/cancel').length, 1);
+    assert.equal(calls.filter((c) => c.op === 'jobs').length, 1);
+    assert.equal(await page.locator('#tryonCounters').textContent(), '2 attempts left this session \u00b7 5 left today');
+  });
+
+  await t.test('a failed job shows the exact PRD wording and only offers Try again when a retry is allowed', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'f'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [{ photo_id: 'p1', width: 10, height: 10, expires_at: '2026-11-01T03:00:00Z' }], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'jobs': () => ({ data: { job_id: 'j1', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => ({ data: { job_id: 'j1', status: 'failed', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', deadline_at: '2026-11-01T01:03:00Z', stage: 'stopped', retry_allowed: true, error_code: 'GENERATION_FAILED', limits: baseLimits } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReuse').hidden, null, { timeout: 5000 });
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonNotice').hidden, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonNotice').textContent(), "We couldn't create your preview. Try again.");
+    assert.equal(await page.locator('#tryonTryAgain').isHidden(), false);
+    await page.locator('#tryonTryAgain').click();
+    assert.equal(await page.locator('#tryonPhoto').isVisible(), true);
   });
 
   await t.test('prototype signup never claims to save an email', async () => {

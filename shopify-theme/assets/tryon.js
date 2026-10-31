@@ -4,10 +4,9 @@
   // One shared fitting-room dialog for every entry point (homepage section,
   // product card and product page). The dialog itself is rendered once from
   // layout/theme.liquid via snippets/tryon-dialog.liquid; this file binds it
-  // once, drives the session/consent/upload flow (step 25), and leaves the
-  // job-creation and result panels (step 26) as an explicit, honest stop
-  // point once a photo is validated, rather than a fabricated generation
-  // state.
+  // once and drives the full session/consent/upload/generation/result flow
+  // (steps 25-26). Shopify cart integration (step 27) is not implemented
+  // here; the Ready panel has no Add to bag action yet.
 
   var KEYS = {
     token: 'nirahh_tryon_session_token',
@@ -19,6 +18,12 @@
     UPLOAD_TOO_LARGE: 'That file is too large or an unsupported format. Use JPEG, PNG or WebP up to 10 MiB.',
     PHOTO_UNSUPPORTED: 'That file is too large or an unsupported format. Use JPEG, PNG or WebP up to 10 MiB.',
     PHOTO_UNSUITABLE: "We couldn't use that photo. Make sure your face and full body are clearly visible in good light."
+  };
+
+  var JOB_FAILURE_MESSAGES = {
+    GENERATION_FAILED: "We couldn't create your preview. Try again.",
+    QUALITY_REJECTED: "That combination didn't meet our quality bar. Try a different photo or saree.",
+    OUTCOME_UNKNOWN: "We couldn't confirm what happened with that preview."
   };
 
   // ---- sessionStorage with an in-memory fallback if storage is denied ----
@@ -74,6 +79,10 @@
     }
   }
 
+  function jobKey(p) {
+    return (p && p.productGid || '') + '|' + (p && p.variantGid || '');
+  }
+
   // A multi-variant product page only keeps the clicked button's own
   // data-tryon-variant-gid attribute in sync with the option selected at
   // render time; resolve the live selection from its form at click time.
@@ -110,12 +119,34 @@
     var config = { proxyPath: '', signedIn: false, loginUrl: '', locale: 'en' };
     var api = null;
     var els = {};
-    var session = { token: null, id: null, limits: null, consentVersion: null, featureEnabled: false };
+    var session = { token: null, id: null, limits: null, consentVersion: null, featureEnabled: false, jobs: [], photos: [] };
     var product = null;
     var pendingFile = null;
     var pendingObjectUrl = null;
     var uploadId = null;
     var activeController = null;
+    var generating = false;
+    var capped = false;
+
+    // Photo reuse (step 26's "selecting a second saree reuses the valid
+    // photo"): 'new' shows the upload fields; 'reuse' shows a validated
+    // photo_id already known for this session (from this page's own earlier
+    // upload, or from session/resume's photos list) and skips straight to
+    // Generate without a second upload.
+    var photoMode = 'new';
+    var reusablePhotoId = null;
+
+    // One idempotency key per (product, variant) job attempt, stable across
+    // a retried request but replaced once that attempt reaches a terminal
+    // state, so a genuine user-requested retry is a new job as the contract
+    // requires. Keyed in memory only; never persisted, since recovery after
+    // a reload uses session/resume's own jobs list instead (server state is
+    // authoritative, matching "resume from the server's persisted state").
+    var pendingJobs = {};
+    var currentJobId = null;
+    var jobPollToken = 0;
+    var latestOriginal = null;
+    var latestResult = null;
 
     function readConfig() {
       var node = document.getElementById('tryonConfig');
@@ -132,6 +163,9 @@
         signin: document.getElementById('tryonSignin'),
         signinBtn: document.getElementById('tryonSigninBtn'),
         photo: document.getElementById('tryonPhoto'),
+        reuse: document.getElementById('tryonReuse'),
+        useDifferentPhoto: document.getElementById('tryonUseDifferentPhoto'),
+        uploadFields: document.getElementById('tryonUploadFields'),
         preview: document.getElementById('tryonPreview'),
         previewCaption: document.getElementById('tryonPreviewCaption'),
         file: document.getElementById('tryonFile'),
@@ -141,7 +175,21 @@
         changePhoto: document.getElementById('tryonChangePhoto'),
         generate: document.getElementById('tryonGenerate'),
         counters: document.getElementById('tryonCounters'),
-        notice: document.getElementById('tryonNotice')
+        notice: document.getElementById('tryonNotice'),
+        create: document.getElementById('tryonCreate'),
+        createStage: document.getElementById('tryonCreateStage'),
+        cancelJob: document.getElementById('tryonCancelJob'),
+        continueShopping: document.getElementById('tryonContinueShopping'),
+        tryAgain: document.getElementById('tryonTryAgain'),
+        ready: document.getElementById('tryonReady'),
+        resultImg: document.getElementById('tryonResultImg'),
+        toggleOriginal: document.getElementById('tryonToggleOriginal'),
+        togglePreview: document.getElementById('tryonTogglePreview'),
+        tryAnother: document.getElementById('tryonTryAnother'),
+        download: document.getElementById('tryonDownload'),
+        deleteBtn: document.getElementById('tryonDelete'),
+        expired: document.getElementById('tryonExpired'),
+        startNew: document.getElementById('tryonStartNew')
       };
     }
 
@@ -167,6 +215,14 @@
 
         if (enabled) wireStaticHandlers();
         restorePendingIfSignedIn();
+
+        // Abort any in-flight request on real navigation; dialog close
+        // (onOpenChange above) already aborts for the dismiss case, but a
+        // same-tab navigation away does not toggle the modal's hidden
+        // attribute first.
+        window.addEventListener('pagehide', function () {
+          if (activeController) activeController.abort();
+        });
       }
       return dialog;
     }
@@ -175,14 +231,28 @@
       if (els.file) els.file.addEventListener('change', onFileChange);
       if (els.consent) els.consent.addEventListener('change', updateGenerateEnabled);
       if (els.changePhoto) els.changePhoto.addEventListener('click', onChangePhotoClick);
+      if (els.useDifferentPhoto) els.useDifferentPhoto.addEventListener('click', onUseDifferentPhotoClick);
       if (els.generate) els.generate.addEventListener('click', onGenerateClick);
       if (els.changeSaree) els.changeSaree.addEventListener('click', function () { dialog._nirahhSetOpen(false); });
       if (els.signinBtn) els.signinBtn.addEventListener('click', onSigninClick);
+      if (els.cancelJob) els.cancelJob.addEventListener('click', onCancelJobClick);
+      if (els.continueShopping) els.continueShopping.addEventListener('click', function () { dialog._nirahhSetOpen(false); });
+      if (els.tryAgain) els.tryAgain.addEventListener('click', onTryAgainClick);
+      if (els.toggleOriginal) els.toggleOriginal.addEventListener('click', function () { setComparison('original'); });
+      if (els.togglePreview) els.togglePreview.addEventListener('click', function () { setComparison('preview'); });
+      if (els.tryAnother) els.tryAnother.addEventListener('click', function () { dialog._nirahhSetOpen(false); });
+      if (els.download) els.download.addEventListener('click', onDownloadClick);
+      if (els.deleteBtn) els.deleteBtn.addEventListener('click', onDeleteClick);
+      if (els.startNew) els.startNew.addEventListener('click', function () { if (product) openForProduct(product); });
     }
 
     function onOpenChange(show) {
       if (show) return;
       if (activeController) { activeController.abort(); activeController = null; }
+      // Dismissing the dialog pauses client-side polling only; the job
+      // keeps running server-side (3.2 Create states) and is recovered from
+      // session/resume's jobs list the next time this product is opened.
+      jobPollToken++;
     }
 
     function newAbortController() {
@@ -191,10 +261,17 @@
       return activeController;
     }
 
+    function beginJobPollSequence() {
+      return ++jobPollToken;
+    }
+
     // ---- panel rendering --------------------------------------------------
     function showPanel(name) {
       if (els.signin) els.signin.hidden = name !== 'signin';
       if (els.photo) els.photo.hidden = name !== 'photo';
+      if (els.create) els.create.hidden = name !== 'create';
+      if (els.ready) els.ready.hidden = name !== 'ready';
+      if (els.expired) els.expired.hidden = name !== 'expired';
     }
 
     function renderSaree(p) {
@@ -221,6 +298,15 @@
     }
     function clearStage() { setStage(null); }
 
+    function stageText(stage) {
+      if (stage === 'queued') return 'Waiting to start\u2026';
+      if (stage === 'creating') return 'Creating your preview\u2026';
+      if (stage === 'checking') return 'Checking the result\u2026';
+      return null;
+    }
+    function setCreateStage(text) { if (els.createStage) els.createStage.textContent = text || ''; }
+    function hideTryAgain() { if (els.tryAgain) els.tryAgain.hidden = true; }
+
     function showProgress(loaded, total) {
       if (!els.progress) return;
       els.progress.hidden = false;
@@ -238,6 +324,32 @@
       els.counters.textContent = l.remaining_generations + ' ' + sessionWord + ' left this session \u00b7 ' + l.account_generations_remaining_today + ' left today';
     }
 
+    // Server-authoritative limits drive both the counters line and whether
+    // Generate/Try another saree stay enabled; local state is never
+    // authoritative (3.3). Account-day exhaustion is shown ahead of session
+    // exhaustion when both are true.
+    function applyLimits(limits) {
+      if (!limits) return;
+      session.limits = limits;
+      renderCounters();
+      capped = limits.effective_remaining_generations <= 0;
+      updateGenerateEnabled();
+      if (els.tryAnother) els.tryAnother.disabled = capped;
+      if (capped) {
+        if (limits.account_generations_remaining_today <= 0) {
+          showNotice("You've used today's 5 previews across your account. More open at " + formatIST(limits.account_quota_resets_at) + ' tonight.', 'polite');
+        } else {
+          showNotice("You've used both previews for this session.", 'polite');
+        }
+      }
+    }
+
+    function updatePhotoModeView() {
+      var reuse = photoMode === 'reuse' && !!reusablePhotoId;
+      if (els.reuse) els.reuse.hidden = !reuse;
+      if (els.uploadFields) els.uploadFields.hidden = reuse;
+    }
+
     function resetPhotoPanel() {
       if (pendingObjectUrl) { URL.revokeObjectURL(pendingObjectUrl); pendingObjectUrl = null; }
       pendingFile = null;
@@ -252,18 +364,39 @@
       updateGenerateEnabled();
     }
 
+    function resetForNewAttempt() {
+      showPanel('photo');
+      updatePhotoModeView();
+      setPhotoControlsDisabled(false);
+      clearStage();
+    }
+
+    function clearAllImages() {
+      if (pendingObjectUrl) { URL.revokeObjectURL(pendingObjectUrl); pendingObjectUrl = null; }
+      pendingFile = null;
+      if (els.preview) { els.preview.removeAttribute('src'); els.preview.hidden = true; }
+      if (els.resultImg) { els.resultImg.removeAttribute('src'); els.resultImg.setAttribute('alt', ''); }
+      latestOriginal = null;
+      latestResult = null;
+      reusablePhotoId = null;
+      photoMode = 'new';
+    }
+
     function setPhotoControlsDisabled(disabled) {
       if (els.file) els.file.disabled = disabled;
       if (els.consent) els.consent.disabled = disabled;
       if (els.changePhoto) els.changePhoto.disabled = disabled;
-      if (els.generate) els.generate.disabled = disabled || !canGenerate();
+      if (els.useDifferentPhoto) els.useDifferentPhoto.disabled = disabled;
+      if (els.generate) els.generate.disabled = disabled || capped || !canGenerate();
     }
 
     function canGenerate() {
-      return !!(pendingFile && els.consent && els.consent.checked && session.token);
+      if (!session.token) return false;
+      if (photoMode === 'reuse') return !!reusablePhotoId;
+      return !!(pendingFile && els.consent && els.consent.checked);
     }
     function updateGenerateEnabled() {
-      if (els.generate) els.generate.disabled = !canGenerate();
+      if (els.generate) els.generate.disabled = capped || !canGenerate();
     }
 
     function onFileChange() {
@@ -280,6 +413,13 @@
     }
 
     function onChangePhotoClick() { resetPhotoPanel(); }
+
+    function onUseDifferentPhotoClick() {
+      photoMode = 'new';
+      reusablePhotoId = null;
+      updatePhotoModeView();
+      updateGenerateEnabled();
+    }
 
     function onSigninClick() {
       if (!product) return;
@@ -311,6 +451,8 @@
         session.limits = data.limits;
         session.consentVersion = data.consent_version;
         session.featureEnabled = data.feature_enabled;
+        session.jobs = data.jobs || [];
+        session.photos = data.photos || [];
         if (session.token) store.set(KEYS.token, session.token);
         if (session.id) store.set(KEYS.id, session.id);
         return session;
@@ -333,6 +475,23 @@
       var pending;
       try { pending = JSON.parse(raw); } catch (e) { return; }
       openForProduct(pending);
+    }
+
+    // A resumed job still running or already ready can be shown again
+    // without a new upload or a new job (F07, and the "dismissing the
+    // dialog keeps the job recoverable" verify condition). A cancelled,
+    // failed, quality-rejected, outcome-unknown or expired job is history,
+    // not something to auto-restore (3.2's Cancelled row).
+    function findResumableJob(jobsList, p) {
+      if (!jobsList || !p) return null;
+      for (var i = jobsList.length - 1; i >= 0; i--) {
+        var j = jobsList[i];
+        if (j.product_gid === p.productGid && j.variant_gid === p.variantGid &&
+            (j.status === 'queued' || j.status === 'processing' || j.status === 'checking' || j.status === 'ready')) {
+          return j;
+        }
+      }
+      return null;
     }
 
     // ---- upload flow -----------------------------------------------------
@@ -367,6 +526,7 @@
     }
 
     function handleError(err) {
+      if (err.limits) applyLimits(err.limits);
       if (err.code === 'CUSTOMER_LOGIN_REQUIRED' || err.code === 'SESSION_INVALID' || err.code === 'SESSION_EXPIRED') {
         store.remove(KEYS.token);
         store.remove(KEYS.id);
@@ -385,15 +545,162 @@
         showNotice("You've used today's 5 previews across your account. More open at " + when + ' tonight.', 'polite');
         return;
       }
+      if (JOB_FAILURE_MESSAGES[err.code]) { showNotice(JOB_FAILURE_MESSAGES[err.code], 'assertive'); return; }
       showNotice(err.message || 'Something went wrong. Please try again.', 'assertive');
     }
 
+    // ---- job creation, polling and results --------------------------------
+    function ensureIdempotencyKey(key) {
+      var rec = pendingJobs[key];
+      if (rec && rec.idempotencyKey && !rec.terminal) return rec.idempotencyKey;
+      var k = randomUUID();
+      pendingJobs[key] = { idempotencyKey: k, terminal: false };
+      return k;
+    }
+    function markJobTerminal(key) { if (pendingJobs[key]) pendingJobs[key].terminal = true; }
+
+    function scheduleJobPoll(token, delayMs) {
+      function waitUntilVisible(cb) {
+        if (!document.hidden) { cb(); return; }
+        document.addEventListener('visibilitychange', function handler() {
+          if (!document.hidden) { document.removeEventListener('visibilitychange', handler); cb(); }
+        });
+      }
+      setTimeout(function () {
+        if (token !== jobPollToken) return;
+        waitUntilVisible(function () {
+          if (token !== jobPollToken) return;
+          var controller = newAbortController();
+          api.jobStatus({ session_token: session.token, job_id: currentJobId }, controller.signal).then(function (data) {
+            if (token !== jobPollToken) return;
+            handleJobStatus(data, token);
+          }).catch(function (err) {
+            if (err.name === 'AbortError' || token !== jobPollToken) return;
+            handleError(err);
+          });
+        });
+      }, delayMs || 3000);
+    }
+
+    // Single place that renders every JobState this dialog can see, whether
+    // it arrived from a fresh create, a poll tick, or resuming a job found
+    // in session/resume's list. Never overlaps with another in-flight poll
+    // for a superseded sequence (the token check above and in every caller).
+    function handleJobStatus(data, token) {
+      currentJobId = data.job_id;
+      applyLimits(data.limits);
+      var key = jobKey({ productGid: data.product_gid, variantGid: data.variant_gid });
+
+      if (data.status === 'queued' || data.status === 'processing' || data.status === 'checking') {
+        showPanel('create');
+        if (!capped) hideNotice();
+        hideTryAgain();
+        setCreateStage(stageText(data.stage));
+        scheduleJobPoll(token, data.poll_after_ms);
+        return;
+      }
+
+      markJobTerminal(key);
+
+      if (data.status === 'ready') {
+        // applyLimits above may have just shown the session/account-exhausted
+        // notice for the attempt that produced this very result; keep it
+        // beside the Ready panel rather than clobbering it (3.2's exhausted
+        // rows: "Existing ready results ... remain active").
+        if (!capped) hideNotice();
+        renderReady(data);
+        return;
+      }
+      if (data.status === 'cancelled') {
+        if (!capped) hideNotice();
+        resetForNewAttempt();
+        return;
+      }
+      if (data.status === 'expired') {
+        clearAllImages();
+        showPanel('expired');
+        return;
+      }
+      // failed / quality_rejected / outcome_unknown: 3.2 keeps the Create
+      // panel, replacing the stage text with the failure notice. If no
+      // retry is offered because the account/session is capped, keep the
+      // more specific cap notice from applyLimits instead of the generic
+      // failure text.
+      showPanel('create');
+      setCreateStage(null);
+      if (data.retry_allowed || !capped) {
+        showNotice(JOB_FAILURE_MESSAGES[data.error_code] || 'Something went wrong. Please try again.', 'assertive');
+      }
+      if (els.tryAgain) els.tryAgain.hidden = !data.retry_allowed;
+    }
+
+    function renderReady(data) {
+      latestOriginal = data.original || null;
+      latestResult = data.result || null;
+      showPanel('ready');
+      setComparison('preview');
+    }
+
+    function setComparison(which) {
+      var usingOriginal = which === 'original';
+      if (els.toggleOriginal) els.toggleOriginal.setAttribute('aria-pressed', String(usingOriginal));
+      if (els.togglePreview) els.togglePreview.setAttribute('aria-pressed', String(!usingOriginal));
+      var asset = usingOriginal ? latestOriginal : latestResult;
+      if (!els.resultImg || !asset) return;
+      els.resultImg.src = asset.url || asset.result_url;
+      els.resultImg.alt = usingOriginal ? 'Your original photo' : (asset.label || 'Your AI styling preview');
+    }
+
+    function submitJob(photoId) {
+      var key = jobKey(product);
+      var idempotencyKey = ensureIdempotencyKey(key);
+      var token = beginJobPollSequence();
+      showPanel('create');
+      hideNotice();
+      hideTryAgain();
+      setCreateStage(stageText('queued'));
+      var controller = newAbortController();
+      api.createJob({
+        session_token: session.token,
+        photo_id: photoId,
+        product_gid: product.productGid,
+        variant_gid: product.variantGid,
+        idempotency_key: idempotencyKey
+      }, controller.signal).then(function (accepted) {
+        currentJobId = accepted.job_id;
+        applyLimits(accepted.limits);
+        var c2 = newAbortController();
+        return api.jobStatus({ session_token: session.token, job_id: accepted.job_id }, c2.signal);
+      }).then(function (full) {
+        generating = false;
+        handleJobStatus(full, token);
+      }).catch(function (err) {
+        generating = false;
+        if (err.name === 'AbortError') return;
+        if (err.code === 'JOB_LIMIT_REACHED') {
+          if (err.limits) applyLimits(err.limits);
+          resetForNewAttempt();
+          showNotice('Another preview is being created right now. Try again in a moment.', 'polite');
+          return;
+        }
+        resetForNewAttempt();
+        handleError(err);
+      });
+    }
+
     function onGenerateClick() {
-      if (!canGenerate()) return;
+      if (generating || !canGenerate()) return;
+      generating = true;
+      hideNotice();
+      setPhotoControlsDisabled(true);
+
+      if (photoMode === 'reuse' && reusablePhotoId) {
+        submitJob(reusablePhotoId);
+        return;
+      }
+
       var file = pendingFile;
       var controller = newAbortController();
-      setPhotoControlsDisabled(true);
-      hideNotice();
       showProgress(0, 100);
 
       api.sessionActivity({ session_token: session.token, action: 'generate' }, controller.signal).catch(function () {});
@@ -417,21 +724,96 @@
       }).then(function (statusData) {
         clearStage();
         if (statusData.status === 'ready') {
-          // Step 26 takes over from a ready photo_id to create the job and
-          // render the Create/Ready panels; this step stops here honestly
-          // rather than fabricating a generation-in-progress state.
-          showNotice("Your photo is ready. Generation isn't wired up yet in this build.", 'polite');
-          setPhotoControlsDisabled(false);
+          reusablePhotoId = statusData.photo_id;
+          photoMode = 'reuse';
+          submitJob(statusData.photo_id);
         } else if (statusData.status === 'rejected') {
+          generating = false;
           showRejected(statusData.reason);
+          setPhotoControlsDisabled(false);
         } else if (statusData.status === 'expired') {
+          generating = false;
           resetPhotoPanel();
           showNotice('That upload expired. Choose your photo again.', 'polite');
+          setPhotoControlsDisabled(false);
         }
       }).catch(function (err) {
+        generating = false;
         if (err.name === 'AbortError') return;
         handleError(err);
         setPhotoControlsDisabled(false);
+      });
+    }
+
+    function onCancelJobClick() {
+      if (!currentJobId) return;
+      var jobId = currentJobId;
+      var controller = newAbortController();
+      els.cancelJob.disabled = true;
+      api.jobCancel({ session_token: session.token, job_id: jobId }, controller.signal).then(function (data) {
+        els.cancelJob.disabled = false;
+        currentJobId = null;
+        applyLimits(data.limits);
+        if (!capped) hideNotice();
+        resetForNewAttempt();
+      }).catch(function (err) {
+        els.cancelJob.disabled = false;
+        if (err.name === 'AbortError') return;
+        handleError(err);
+      });
+    }
+
+    function onTryAgainClick() {
+      hideNotice();
+      hideTryAgain();
+      resetForNewAttempt();
+    }
+
+    // Refreshes the signed result link through an authorized status read
+    // (never constructed or reused locally past its 60-second validity)
+    // immediately before triggering the browser download.
+    function onDownloadClick() {
+      if (!currentJobId) return;
+      var controller = newAbortController();
+      api.jobStatus({ session_token: session.token, job_id: currentJobId }, controller.signal).then(function (data) {
+        if (!data.result) return;
+        latestOriginal = data.original || latestOriginal;
+        latestResult = data.result;
+        var a = document.createElement('a');
+        a.href = data.result.result_url;
+        a.download = 'nirahh-preview.jpg';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }).catch(function (err) { if (err.name !== 'AbortError') handleError(err); });
+    }
+
+    // Session-wide deletion is the only deletion operation the contract
+    // exposes; there is no per-photo or per-job delete. It optimistically
+    // clears the local view once the immediate revoke responds, rather than
+    // blocking on /deletions/status completing (3.6).
+    function onDeleteClick() {
+      var controller = newAbortController();
+      if (els.deleteBtn) els.deleteBtn.disabled = true;
+      api.sessionDelete({ session_token: session.token }, controller.signal).then(function () {
+        clearAllImages();
+        store.remove(KEYS.token);
+        store.remove(KEYS.id);
+        session.token = null;
+        session.id = null;
+        session.limits = null;
+        session.jobs = [];
+        session.photos = [];
+        currentJobId = null;
+        pendingJobs = {};
+        jobPollToken++;
+        hideNotice();
+        showPanel('expired');
+      }).catch(function (err) {
+        if (els.deleteBtn) els.deleteBtn.disabled = false;
+        if (err.name === 'AbortError') return;
+        handleError(err);
       });
     }
 
@@ -444,7 +826,11 @@
 
       if (!enabled) { node._nirahhSetOpen(true); return; }
 
+      photoMode = 'new';
+      reusablePhotoId = null;
+      currentJobId = null;
       resetPhotoPanel();
+      updatePhotoModeView();
       hideNotice();
       node._nirahhSetOpen(true);
 
@@ -458,11 +844,18 @@
       ensureSession(controller.signal)
         .then(function () {
           api.sessionActivity({ session_token: session.token, action: 'select_product' }, controller.signal).catch(function () {});
-          return checkEligibility(controller.signal);
+          if (session.photos.length) {
+            reusablePhotoId = session.photos[session.photos.length - 1].photo_id;
+            photoMode = 'reuse';
+          }
+          var resumableJob = findResumableJob(session.jobs, p);
+          return checkEligibility(controller.signal).then(function (eligibility) {
+            return { eligibility: eligibility, job: resumableJob };
+          });
         })
-        .then(function (eligibility) {
+        .then(function (found) {
           clearStage();
-          if (eligibility && eligibility.eligible === false) {
+          if (found.eligibility && found.eligibility.eligible === false) {
             // PRD.md 3.6: an ineligible product should never show a try-on
             // button at all (a catalogue check before Select photo, not a
             // dialog error). Full grid pre-filtering is deferred; until
@@ -471,8 +864,24 @@
             node._nirahhSetOpen(false);
             return;
           }
+          if (found.job) {
+            var token = beginJobPollSequence();
+            currentJobId = found.job.job_id;
+            // JobSummary carries only a JobState (queued/processing/checking/
+            // ready), not the finer JobStatusData.stage text; show a generic
+            // placeholder until the authoritative jobStatus call below
+            // replaces it (and may switch straight to the Ready panel).
+            showPanel('create');
+            setCreateStage(stageText('checking'));
+            var c2 = newAbortController();
+            api.jobStatus({ session_token: session.token, job_id: found.job.job_id }, c2.signal)
+              .then(function (data) { handleJobStatus(data, token); })
+              .catch(function (err) { if (err.name !== 'AbortError') handleError(err); });
+            return;
+          }
+          updatePhotoModeView();
           setPhotoControlsDisabled(false);
-          renderCounters();
+          applyLimits(session.limits);
         })
         .catch(function (err) {
           if (err.name === 'AbortError') return;

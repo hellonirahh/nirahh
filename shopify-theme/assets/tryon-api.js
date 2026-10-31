@@ -93,7 +93,11 @@
       uploadPrepare: function (body, signal) { return postJSON(base + '/uploads/prepare', body, signal); },
       uploadComplete: function (body, signal) { return postJSON(base + '/uploads/complete', body, signal); },
       uploadStatus: function (body, signal) { return postJSON(base + '/uploads/status', body, signal); },
-      uploadFile: uploadFile
+      uploadFile: uploadFile,
+      createJob: function (body, signal) { return postJSON(base + '/jobs', body, signal); },
+      jobStatus: function (body, signal) { return postJSON(base + '/jobs/status', body, signal); },
+      jobCancel: function (body, signal) { return postJSON(base + '/jobs/cancel', body, signal); },
+      sessionDelete: function (body, signal) { return postJSON(base + '/session/delete', body, signal); }
     };
   }
 
