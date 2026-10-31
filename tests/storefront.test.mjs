@@ -113,20 +113,60 @@ test('storefront browser regressions', async (t) => {
     await page.waitForFunction(() => document.body.style.overflow !== 'hidden');
   });
 
-  await t.test('Shopify try-on closes on its homepage anchor link', async () => {
+  await t.test('Shopify try-on entry point opens the shared dialog and closes via its action link', async () => {
     const page = await newPage();
     const source = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
     const modal = source.slice(source.indexOf('<!-- Try-on modal -->'), source.indexOf('<script src='));
     await page.route('http://nirahh.test/theme-modal.html', route => route.fulfill({
       contentType: 'text/html',
-      body: `<button id="tryOnBtn">Try on</button>${modal}<script src="/shopify-theme/assets/dialog.js"></script><script src="/shopify-theme/assets/theme.js"></script>`
+      body: `<button id="tryOnBtn" data-tryon-open data-tryon-product-gid="gid://shopify/Product/1" data-tryon-title="Test saree">Try on</button>${modal}<script src="/shopify-theme/assets/dialog.js"></script><script src="/shopify-theme/assets/theme.js"></script><script src="/shopify-theme/assets/tryon.js"></script>`
     }));
     await page.goto('http://nirahh.test/theme-modal.html');
     await page.locator('#tryOnBtn').click();
     assert.equal(await page.evaluate(() => document.activeElement.id), 'modalClose');
+    assert.equal(await page.evaluate(() => document.getElementById('tryOnModal').dataset.productGid), 'gid://shopify/Product/1');
     await page.locator('#tryOnModal a').click();
     assert.equal(await page.locator('#tryOnModal').isVisible(), false);
     assert.equal(await page.evaluate(() => document.body.style.overflow), '');
+  });
+
+  await t.test('try-on buttons carry product context and bind once per section reload', async () => {
+    const page = await newPage();
+    // Shopify-rendered DOM contract: the shared dialog from layout/theme.liquid
+    // plus one entry point inside a section the theme editor can reload on its own.
+    await page.setContent(`
+      <div class="modal" id="tryOnModal" hidden><div class="modal-panel" role="dialog" aria-modal="true">
+        <button class="modal-close" id="modalClose" type="button">x</button>
+        <div class="modal-body"><p id="tryOnContext"></p></div>
+      </div></div>
+      <div id="card">
+        <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+                data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Test saree">Try on</button>
+      </div>`);
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    assert.equal(await page.locator('#tryOnModal').isVisible(), true);
+    assert.equal(await page.evaluate(() => document.getElementById('tryOnModal').dataset.productGid), 'gid://shopify/Product/1');
+    assert.equal(await page.evaluate(() => document.getElementById('tryOnModal').dataset.variantGid), 'gid://shopify/ProductVariant/1');
+    assert.match(await page.locator('#tryOnContext').textContent(), /Test saree/);
+    await page.locator('#modalClose').click();
+
+    // The theme editor can reload the card's section markup repeatedly without
+    // a page reload; re-init must never attach a second click listener.
+    await page.evaluate(() => {
+      const dialog = document.getElementById('tryOnModal');
+      const original = dialog._nirahhSetOpen;
+      window.__opens = 0;
+      dialog._nirahhSetOpen = function (open) { window.__opens++; return original(open); };
+      const card = document.getElementById('card');
+      document.dispatchEvent(Object.assign(new CustomEvent('shopify:section:load', { bubbles: true }), {}));
+      card.dispatchEvent(new CustomEvent('shopify:section:load', { bubbles: true }));
+      card.dispatchEvent(new CustomEvent('shopify:section:load', { bubbles: true }));
+    });
+    await page.locator('[data-tryon-open]').click();
+    assert.equal(await page.evaluate(() => window.__opens), 1);
   });
 
   await t.test('prototype signup never claims to save an email', async () => {

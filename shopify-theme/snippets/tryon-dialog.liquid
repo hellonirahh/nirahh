@@ -1,0 +1,38 @@
+{%- comment -%}
+  One shared fitting-room dialog, rendered once from layout/theme.liquid so
+  every entry point (homepage section, product card, product page) can open
+  it without navigating to a different page first. An entry point marks its
+  trigger with data-tryon-open (plus data-tryon-product-gid/-variant-gid/
+  -title where it has a specific product); assets/tryon.js reads those
+  attributes into this dialog's own dataset and into #tryOnContext before
+  opening it, so the dialog always reflects the product it was opened for.
+
+  settings.tryon_enabled gates which panel renders:
+  - off (default): the existing "still in the works" message, unchanged from
+    the previous per-section placeholder.
+  - on: a minimal shell naming the product. Steps 25-26 fill in the actual
+    sign-in, consent, upload and generation panels this shell leaves for them;
+    this step only proves the right entry point opens with the right product.
+{%- endcomment -%}
+<div class="modal" id="tryOnModal" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
+    <button class="modal-close" id="modalClose" aria-label="{{ 'general.close' | t }}" type="button">&times;</button>
+
+    <div class="modal-body">
+      {%- if settings.tryon_enabled -%}
+        <p class="eyebrow">See yourself in it</p>
+        <h3 id="tryOnTitle" class="display">Fitting room</h3>
+        <p class="lead" id="tryOnContext" aria-live="polite">Preparing your preview&hellip;</p>
+        <p class="fineprint">Sign-in, photo upload and your preview open here next.</p>
+      {%- else -%}
+        <p class="eyebrow">See yourself in it</p>
+        <h3 id="tryOnTitle" class="display">This feature is still in the works.</h3>
+        <p class="lead">We're building a private, on-you preview of the Nirahh Edit. It isn't ready to launch just yet — check back soon.</p>
+        <div class="modal-actions">
+          <a class="btn btn-solid" href="{{ routes.root_url }}#the-edit">Explore the Edit</a>
+        </div>
+        <p class="fineprint">We'll let you know the moment it's ready.</p>
+      {%- endif -%}
+    </div>
+  </div>
+</div>

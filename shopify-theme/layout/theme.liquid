@@ -47,6 +47,7 @@
   {{ 'marcellus.woff2' | asset_url | preload_tag: as: 'font', type: 'font/woff2' }}
   {{ 'fonts.css' | asset_url | stylesheet_tag }}
   {{ 'style.css' | asset_url | stylesheet_tag }}
+  {{ 'tryon.css' | asset_url | stylesheet_tag }}
 
   {%- comment -%}
     The palette lives in the stylesheet as custom properties. Re-declaring it
@@ -82,7 +83,10 @@
 
   {% section 'footer' %}
 
+  {% render 'tryon-dialog' %}
+
   <script src="{{ 'dialog.js' | asset_url }}" defer></script>
   <script src="{{ 'theme.js' | asset_url }}" defer></script>
+  <script src="{{ 'tryon.js' | asset_url }}" defer></script>
 </body>
 </html>

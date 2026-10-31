@@ -1,0 +1,21 @@
+/* Virtual try-on entry points (steps 24-27). Locally scoped: the shared
+   dialog itself reuses .modal/.modal-panel/.modal-close/.modal-actions and
+   the .btn/.eyebrow/.display/.lead/.fineprint type styles already defined in
+   style.css, so only the one new entry point below needs a rule here. */
+.product-try {
+  margin-top: .5rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: .62rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: color .3s ease;
+}
+.product-try:hover {
+  color: var(--ink);
+}

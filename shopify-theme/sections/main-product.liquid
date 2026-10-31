@@ -103,7 +103,12 @@
           {%- endif -%}
         </button>
         {%- if section.settings.show_try_on -%}
-          <a class="btn btn-ghost pdp-try" href="{{ routes.root_url }}#try-on">See yourself in it</a>
+          <button type="button" class="btn btn-ghost pdp-try" data-tryon-open
+                  data-tryon-product-gid="gid://shopify/Product/{{ product.id }}"
+                  data-tryon-variant-gid="gid://shopify/ProductVariant/{{ variant.id }}"
+                  data-tryon-title="{{ product.title | escape }}">
+            {{ 'products.product.try_on' | t }}
+          </button>
         {%- endif -%}
       </div>
     {%- endform -%}

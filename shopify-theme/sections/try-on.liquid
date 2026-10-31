@@ -8,7 +8,7 @@
       {%- if section.settings.body != blank -%}
         <p class="lead">{{ section.settings.body }}</p>
       {%- endif -%}
-      <button class="btn btn-solid" id="tryOnBtn" type="button" aria-describedby="tryOnNotice">{{ section.settings.button_label }}</button>
+      <button class="btn btn-solid" id="tryOnBtn" type="button" data-tryon-open aria-describedby="tryOnNotice">{{ section.settings.button_label }}</button>
       <p class="fineprint" id="tryOnNotice"><strong>Under development — virtual try-on is not available yet.</strong></p>
       {%- if section.settings.fineprint != blank -%}
         <p class="fineprint">{{ section.settings.fineprint }}</p>
@@ -28,29 +28,13 @@
   </div>
 </section>
 
-<div class="modal" id="tryOnModal" hidden>
-  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
-    <button class="modal-close" id="modalClose" aria-label="{{ 'general.close' | t }}" type="button">&times;</button>
-
-    <div class="modal-body">
-      <p class="eyebrow">{{ section.settings.eyebrow }}</p>
-      <h3 id="tryOnTitle" class="display">This feature is still in the works.</h3>
-      <p class="lead">We're building a private, on-you preview of the Nirahh Edit. It isn't ready to launch just yet — check back soon.</p>
-      <div class="modal-actions">
-        <a class="btn btn-solid" href="{{ routes.root_url }}#the-edit">Explore the Edit</a>
-      </div>
-      <p class="fineprint">We'll let you know the moment it's ready.</p>
-    </div>
-  </div>
-</div>
-
 {% schema %}
 {
   "name": "See yourself in it",
   "settings": [
     {
       "type": "paragraph",
-      "content": "The try-on backend isn't built yet, so this button opens a \"coming soon\" message rather than the old fake upload-and-preview flow. Swap the modal markup back in once the real rendering service ships."
+      "content": "This button opens the one shared fitting-room dialog rendered from layout/theme.liquid (snippets/tryon-dialog.liquid), not a dialog of its own. That shared dialog shows a \"still in the works\" message until the Virtual try-on settings group's \"Enable virtual try-on\" switch is turned on."
     },
     {
       "type": "text",
