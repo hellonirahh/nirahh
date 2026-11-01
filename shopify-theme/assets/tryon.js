@@ -5,8 +5,9 @@
   // product card and product page). The dialog itself is rendered once from
   // layout/theme.liquid via snippets/tryon-dialog.liquid; this file binds it
   // once and drives the full session/consent/upload/generation/result flow
-  // (steps 25-26). Shopify cart integration (step 27) is not implemented
-  // here; the Ready panel has no Add to bag action yet.
+  // (steps 25-26) plus Add to bag through Shopify's own Ajax cart endpoint
+  // (step 27) — a separate commerce boundary from the nirahh-tryon proxy
+  // client in tryon-api.js.
 
   var KEYS = {
     token: 'nirahh_tryon_session_token',
@@ -98,8 +99,18 @@
       productGid: button.dataset.tryonProductGid || '',
       variantGid: variantGidFor(button),
       title: button.dataset.tryonTitle || '',
-      image: button.dataset.tryonImage || ''
+      image: button.dataset.tryonImage || '',
+      url: button.dataset.tryonUrl || ''
     };
+  }
+
+  // Shopify GIDs end in the same decimal numeric ID the Ajax cart endpoint
+  // expects (gid://shopify/ProductVariant/987654321 -> "987654321"); no
+  // separate lookup is needed in the theme.
+  function numericIdFromGid(gid) {
+    if (!gid) return null;
+    var last = String(gid).split('/').pop();
+    return /^\d+$/.test(last) ? last : null;
   }
 
   function initButtons(scope) {
@@ -116,7 +127,7 @@
   var TryOn = (function () {
     var dialog = null;
     var enabled = false;
-    var config = { proxyPath: '', signedIn: false, loginUrl: '', locale: 'en' };
+    var config = { proxyPath: '', signedIn: false, loginUrl: '', locale: 'en', cartRoot: '/', cartUrl: '/cart' };
     var api = null;
     var els = {};
     var session = { token: null, id: null, limits: null, consentVersion: null, featureEnabled: false, jobs: [], photos: [] };
@@ -147,6 +158,12 @@
     var jobPollToken = 0;
     var latestOriginal = null;
     var latestResult = null;
+
+    // The exact product/variant the ready job was created for, read from
+    // the job's own server response rather than whatever the underlying
+    // page's variant selector shows now (3.6/16: "changing the product
+    // selector does not relabel an old result").
+    var readyVariantGid = null;
 
     function readConfig() {
       var node = document.getElementById('tryonConfig');
@@ -188,6 +205,8 @@
         tryAnother: document.getElementById('tryonTryAnother'),
         download: document.getElementById('tryonDownload'),
         deleteBtn: document.getElementById('tryonDelete'),
+        addToBag: document.getElementById('tryonAddToBag'),
+        productLink: document.getElementById('tryonProductLink'),
         expired: document.getElementById('tryonExpired'),
         startNew: document.getElementById('tryonStartNew')
       };
@@ -243,6 +262,7 @@
       if (els.tryAnother) els.tryAnother.addEventListener('click', function () { dialog._nirahhSetOpen(false); });
       if (els.download) els.download.addEventListener('click', onDownloadClick);
       if (els.deleteBtn) els.deleteBtn.addEventListener('click', onDeleteClick);
+      if (els.addToBag) els.addToBag.addEventListener('click', onAddToBagClick);
       if (els.startNew) els.startNew.addEventListener('click', function () { if (product) openForProduct(product); });
     }
 
@@ -369,6 +389,8 @@
       updatePhotoModeView();
       setPhotoControlsDisabled(false);
       clearStage();
+      readyVariantGid = null;
+      if (els.addToBag) els.addToBag.disabled = true;
     }
 
     function clearAllImages() {
@@ -378,6 +400,9 @@
       if (els.resultImg) { els.resultImg.removeAttribute('src'); els.resultImg.setAttribute('alt', ''); }
       latestOriginal = null;
       latestResult = null;
+      readyVariantGid = null;
+      if (els.productLink) els.productLink.hidden = true;
+      if (els.addToBag) els.addToBag.disabled = true;
       reusablePhotoId = null;
       photoMode = 'new';
     }
@@ -637,8 +662,28 @@
     function renderReady(data) {
       latestOriginal = data.original || null;
       latestResult = data.result || null;
+      // Server-authoritative: the job's own variant_gid, not a possibly
+      // since-changed live selector (3.6/16).
+      readyVariantGid = data.variant_gid || (product && product.variantGid) || null;
       showPanel('ready');
       setComparison('preview');
+      updateProductLink();
+      if (els.addToBag) els.addToBag.disabled = !numericIdFromGid(readyVariantGid);
+    }
+
+    // The garment detail link always points at the real product page for
+    // whichever product this dialog currently represents (3.1 Comparison:
+    // "pointing at the real product photo and description"). Hidden when an
+    // entry point did not carry a URL (e.g. the homepage CTA has no single
+    // product) rather than guessing one.
+    function updateProductLink() {
+      if (!els.productLink) return;
+      if (product && product.url) {
+        els.productLink.href = product.url;
+        els.productLink.hidden = false;
+      } else {
+        els.productLink.hidden = true;
+      }
     }
 
     function setComparison(which) {
@@ -789,6 +834,52 @@
       }).catch(function (err) { if (err.name !== 'AbortError') handleError(err); });
     }
 
+    // Adds the exact product/variant the ready job was created for through
+    // Shopify's own locale-aware Ajax cart endpoint (S04) — a separate
+    // commerce boundary from the nirahh-tryon proxy, never carrying any
+    // photo, capability or signed URL in its body. A sold-out/inventory
+    // rejection (422) is routed to the product page, which already has
+    // real-time stock UI, rather than inventing stock wording in the
+    // dialog; any other failure shows the generic safe notice and lets the
+    // shopper retry without leaving the dialog.
+    function cartAddUrl() {
+      var root = (config.cartRoot || '/').replace(/\/+$/, '');
+      return root + '/cart/add.js';
+    }
+
+    function onAddToBagClick() {
+      var variantId = numericIdFromGid(readyVariantGid);
+      if (!variantId) { showNotice('Something went wrong. Please try again.', 'assertive'); return; }
+      if (els.addToBag) els.addToBag.disabled = true;
+      var controller = newAbortController();
+      fetch(cartAddUrl(), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ id: variantId, quantity: 1 }),
+        signal: controller.signal
+      }).then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (payload) {
+          return { ok: response.ok, status: response.status, payload: payload };
+        });
+      }).then(function (result) {
+        if (result.ok) {
+          window.location.assign(config.cartUrl || '/cart');
+          return;
+        }
+        if (els.addToBag) els.addToBag.disabled = false;
+        if (result.status === 422) {
+          window.location.assign((product && product.url) || config.cartUrl || '/');
+          return;
+        }
+        showNotice('Something went wrong. Please try again.', 'assertive');
+      }).catch(function (err) {
+        if (els.addToBag) els.addToBag.disabled = false;
+        if (err.name === 'AbortError') return;
+        showNotice('Something went wrong. Please try again.', 'assertive');
+      });
+    }
+
     // Session-wide deletion is the only deletion operation the contract
     // exposes; there is no per-photo or per-job delete. It optimistically
     // clears the local view once the immediate revoke responds, rather than
@@ -829,6 +920,9 @@
       photoMode = 'new';
       reusablePhotoId = null;
       currentJobId = null;
+      readyVariantGid = null;
+      if (els.productLink) els.productLink.hidden = true;
+      if (els.addToBag) els.addToBag.disabled = true;
       resetPhotoPanel();
       updatePhotoModeView();
       hideNotice();

@@ -119,7 +119,7 @@ test('storefront browser regressions', async (t) => {
   // pattern already used below for the variant-sync test, since there is no
   // Shopify Liquid renderer available in CI.
   function tryonDialogFixture(signedIn) {
-    const config = JSON.stringify({ proxyPath: '/apps/nirahh-tryon', signedIn, loginUrl: '/account/login', locale: 'en' });
+    const config = JSON.stringify({ proxyPath: '/apps/nirahh-tryon', signedIn, loginUrl: '/account/login', locale: 'en', cartRoot: '/', cartUrl: '/cart' });
     return `
       <div class="modal" id="tryOnModal" hidden><div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
         <button class="modal-close" id="modalClose" aria-label="Close" type="button">&times;</button>
@@ -169,12 +169,14 @@ test('storefront browser regressions', async (t) => {
             <div class="tryon-compare" role="group" aria-label="Compare your photo and the preview">
               <button type="button" class="btn btn-ghost" id="tryonToggleOriginal" aria-pressed="false">Original</button>
               <button type="button" class="btn btn-ghost" id="tryonTogglePreview" aria-pressed="true">Preview</button>
+              <a class="tryon-detail-link" id="tryonProductLink" href="#" hidden>View the real product photos and description</a>
             </div>
             <p class="fineprint" id="tryonBlouseNote">Blouse note</p>
             <div class="tryon-photo-actions">
               <button type="button" class="btn btn-ghost" id="tryonTryAnother">Try another saree</button>
               <button type="button" class="btn btn-ghost" id="tryonDownload">Download</button>
               <button type="button" class="btn btn-ghost" id="tryonDelete">Delete</button>
+              <button type="button" class="btn btn-solid" id="tryonAddToBag" disabled>Add to bag</button>
             </div>
           </div>
           <div class="tryon-panel" id="tryonExpired" hidden>
@@ -798,6 +800,95 @@ test('storefront browser regressions', async (t) => {
     assert.equal(await page.locator('#tryonTryAgain').isHidden(), false);
     await page.locator('#tryonTryAgain').click();
     assert.equal(await page.locator('#tryonPhoto').isVisible(), true);
+  });
+
+  await t.test('Add to bag adds the exact job\'s product/variant through Shopify\'s own Ajax cart endpoint, with no private data in the request, and the toggle never changes which variant it targets', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'g'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/42" data-tryon-title="Rani saree"
+              data-tryon-url="/products/rani-saree">Try on</button>`);
+    await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [{ photo_id: 'p1', width: 10, height: 10, expires_at: '2026-11-01T03:00:00Z' }], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/42', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'jobs': () => ({ data: { job_id: 'j1', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => ({
+        data: {
+          job_id: 'j1', status: 'ready', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/42',
+          deadline_at: '2026-11-01T01:03:00Z', stage: 'complete', retry_allowed: false, limits: baseLimits,
+          original: { url: 'http://nirahh.test/original.jpg', url_expires_at: '2026-11-01T01:01:00Z', width: 10, height: 10, content_type: 'image/jpeg' },
+          result: { result_url: 'http://nirahh.test/result.jpg', url_expires_at: '2026-11-01T01:01:00Z', width: 10, height: 10, content_type: 'image/jpeg', label: 'AI styling preview' }
+        }
+      })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    const cartCalls = [];
+    await page.route('http://nirahh.test/cart/add.js', async (route) => {
+      cartCalls.push(JSON.parse(route.request().postData() || '{}'));
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 999999, quantity: 1, variant_id: 42 }) });
+    });
+    await page.route('http://nirahh.test/cart', (route) => route.fulfill({ contentType: 'text/html', body: '<p>cart</p>' }));
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReuse').hidden, null, { timeout: 5000 });
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReady').hidden, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonAddToBag').isDisabled(), false);
+    assert.equal(await page.locator('#tryonProductLink').getAttribute('href'), '/products/rani-saree');
+
+    // Comparing Original/Preview must not change which variant a later Add
+    // to bag targets.
+    await page.locator('#tryonToggleOriginal').click();
+    await page.locator('#tryonTogglePreview').click();
+
+    await page.locator('#tryonAddToBag').click();
+    await page.waitForURL('http://nirahh.test/cart');
+    assert.deepEqual(cartCalls, [{ id: '42', quantity: 1 }]);
+  });
+
+  await t.test('a sold-out variant is routed to the product page instead of being silently added', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'h'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/42" data-tryon-title="Rani saree"
+              data-tryon-url="/products/rani-saree">Try on</button>`);
+    await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [{ photo_id: 'p1', width: 10, height: 10, expires_at: '2026-11-01T03:00:00Z' }], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/42', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'jobs': () => ({ data: { job_id: 'j1', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => ({
+        data: {
+          job_id: 'j1', status: 'ready', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/42',
+          deadline_at: '2026-11-01T01:03:00Z', stage: 'complete', retry_allowed: false, limits: baseLimits,
+          original: { url: 'http://nirahh.test/original.jpg', url_expires_at: '2026-11-01T01:01:00Z', width: 10, height: 10, content_type: 'image/jpeg' },
+          result: { result_url: 'http://nirahh.test/result.jpg', url_expires_at: '2026-11-01T01:01:00Z', width: 10, height: 10, content_type: 'image/jpeg', label: 'AI styling preview' }
+        }
+      })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.route('http://nirahh.test/cart/add.js', (route) => route.fulfill({
+      status: 422, contentType: 'application/json',
+      body: JSON.stringify({ status: 422, message: 'Sold out', description: 'That variant is sold out.' })
+    }));
+    await page.route('http://nirahh.test/products/rani-saree', (route) => route.fulfill({ contentType: 'text/html', body: '<p>sold out on the real product page</p>' }));
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReuse').hidden, null, { timeout: 5000 });
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReady').hidden, null, { timeout: 5000 });
+
+    await page.locator('#tryonAddToBag').click();
+    await page.waitForURL('http://nirahh.test/products/rani-saree');
   });
 
   await t.test('prototype signup never claims to save an email', async () => {

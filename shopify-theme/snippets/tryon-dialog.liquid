@@ -9,16 +9,18 @@
   settings.tryon_enabled gates which panel set renders:
   - off (default): the existing "still in the works" message, unchanged.
   - on: the real session/consent/upload flow (step 25) plus job creation,
-    polling, comparison, download, retry, cancellation and deletion
-    (step 26). #tryonPhoto covers Select/Review photo and either the normal
-    upload fields (#tryonUploadFields) or, when the session already has a
-    validated photo, the reuse view (#tryonReuse) that skips straight to
-    Generate without a second upload. #tryonCreate covers queued/creating/
-    checking and, in the same panel, a job failure/quality-rejection/
-    outcome-unknown notice with its own Try again action. #tryonReady covers
-    the finished preview, Original/Preview comparison, Download, Try another
-    saree and Delete. #tryonExpired covers session expiry or an explicit
-    deletion.
+    polling, comparison, download, retry, cancellation, deletion (step 26)
+    and Shopify cart integration (step 27). #tryonPhoto covers Select/Review
+    photo and either the normal upload fields (#tryonUploadFields) or, when
+    the session already has a validated photo, the reuse view (#tryonReuse)
+    that skips straight to Generate without a second upload. #tryonCreate
+    covers queued/creating/checking and, in the same panel, a job failure/
+    quality-rejection/outcome-unknown notice with its own Try again action.
+    #tryonReady covers the finished preview, Original/Preview comparison, a
+    link to the real product photos/description, Add to bag (the exact
+    product/variant the job was created for, added through Shopify's own
+    Ajax cart endpoint), Download, Try another saree and Delete. #tryonExpired
+    covers session expiry or an explicit deletion.
 
   #tryonConfig below is read once by assets/tryon.js; it carries no
   credential, only the non-secret values Liquid already has at render time.
@@ -34,7 +36,9 @@
             "proxyPath": {{ settings.tryon_proxy_path | json }},
             "signedIn": {{ customer != blank | json }},
             "loginUrl": {{ routes.account_login_url | json }},
-            "locale": {{ request.locale.iso_code | default: 'en' | json }}
+            "locale": {{ request.locale.iso_code | default: 'en' | json }},
+            "cartRoot": {{ routes.root_url | json }},
+            "cartUrl": {{ routes.cart_url | json }}
           }
         </script>
 
@@ -103,12 +107,14 @@
           <div class="tryon-compare" role="group" aria-label="Compare your photo and the preview">
             <button type="button" class="btn btn-ghost" id="tryonToggleOriginal" aria-pressed="false">Original</button>
             <button type="button" class="btn btn-ghost" id="tryonTogglePreview" aria-pressed="true">Preview</button>
+            <a class="tryon-detail-link" id="tryonProductLink" href="#" hidden>View the real product photos and description</a>
           </div>
           <p class="fineprint" id="tryonBlouseNote">Blouse styling shown is a suggestion; it's included only if the product description says so.</p>
           <div class="tryon-photo-actions">
             <button type="button" class="btn btn-ghost" id="tryonTryAnother">Try another saree</button>
             <button type="button" class="btn btn-ghost" id="tryonDownload">Download</button>
             <button type="button" class="btn btn-ghost" id="tryonDelete">Delete</button>
+            <button type="button" class="btn btn-solid" id="tryonAddToBag" disabled>Add to bag</button>
           </div>
         </div>
 

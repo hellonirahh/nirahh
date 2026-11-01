@@ -127,3 +127,14 @@
   color: var(--ink);
   border-color: currentColor;
 }
+.tryon-detail-link {
+  align-self: center;
+  margin-left: auto;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  color: var(--muted);
+  text-decoration: underline;
+}
+.tryon-detail-link:hover {
+  color: var(--ink);
+}
