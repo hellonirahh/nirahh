@@ -31,10 +31,22 @@
 
     <div class="modal-body">
       {%- if settings.tryon_enabled -%}
+        {%- comment -%}
+          Liquid's {{ }} output tag only evaluates variables/filters, not
+          comparison operators; `customer != blank` is only valid inside a
+          {% if %}/{% unless %} tag. Resolve the boolean with `liquid`/`assign`
+          first, matching Shopify Theme Check's LiquidHTMLSyntaxError rule.
+        {%- endcomment -%}
+        {%- liquid
+          assign tryon_signed_in = false
+          if customer
+            assign tryon_signed_in = true
+          endif
+        -%}
         <script type="application/json" id="tryonConfig">
           {
             "proxyPath": {{ settings.tryon_proxy_path | json }},
-            "signedIn": {{ customer != blank | json }},
+            "signedIn": {{ tryon_signed_in | json }},
             "loginUrl": {{ routes.account_login_url | json }},
             "locale": {{ request.locale.iso_code | default: 'en' | json }},
             "cartRoot": {{ routes.root_url | json }},
@@ -45,7 +57,7 @@
         <h3 id="tryOnTitle" class="display">Fitting room</h3>
 
         <div class="tryon-saree" id="tryonSaree">
-          <img class="tryon-saree-image" id="tryonSareeImage" alt="" hidden>
+          <img class="tryon-saree-image" id="tryonSareeImage" alt="" width="56" height="56" hidden>
           <div class="tryon-saree-info">
             <p class="eyebrow">See yourself in it</p>
             <p class="lead" id="tryonSareeTitle"></p>
@@ -71,7 +83,7 @@
               <li>Front-facing pose, arms away from the torso</li>
             </ul>
 
-            <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" hidden>
+            <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" width="768" height="1024" hidden>
             <p class="lead" id="tryonPreviewCaption" hidden>This is how you'll look in this saree.</p>
 
             <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
@@ -103,7 +115,7 @@
 
         <div class="tryon-panel" id="tryonReady" hidden>
           <p class="lead">Here's your AI styling preview.</p>
-          <img class="tryon-preview tryon-result" id="tryonResultImg" alt="">
+          <img class="tryon-preview tryon-result" id="tryonResultImg" alt="" width="768" height="1024">
           <div class="tryon-compare" role="group" aria-label="Compare your photo and the preview">
             <button type="button" class="btn btn-ghost" id="tryonToggleOriginal" aria-pressed="false">Original</button>
             <button type="button" class="btn btn-ghost" id="tryonTogglePreview" aria-pressed="true">Preview</button>
