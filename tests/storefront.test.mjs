@@ -462,7 +462,7 @@ test('storefront browser regressions', async (t) => {
     assert.equal(await page.locator('#tryonGenerate').isDisabled(), false);
   });
 
-  await t.test('an ineligible product closes the dialog quietly instead of showing an undesigned error', async () => {
+  await t.test('an ineligible product stays open and explains why try-on is not offered', async () => {
     const page = await newPage();
     await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', '6'.repeat(43)); });
     await gotoFixture(page, `${tryonDialogFixture(true)}
@@ -477,7 +477,9 @@ test('storefront browser regressions', async (t) => {
     await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
 
     await page.locator('[data-tryon-open]').click();
-    await page.waitForFunction(() => document.getElementById('tryOnModal').hidden, null, { timeout: 5000 });
+    await page.waitForFunction(() => !document.getElementById('tryOnModal').hidden && !document.getElementById('tryonNotice').hidden, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonNotice').textContent(), "This saree isn't in the try-on preview yet.");
+    assert.equal(await page.locator('#tryonPhoto').isHidden(), true);
   });
 
   await t.test('resume rejecting a stale or foreign session token starts fresh rather than showing a previous account', async () => {

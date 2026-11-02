@@ -909,11 +909,26 @@
     }
 
     // ---- entry point -------------------------------------------------
+    function eligibilityMessage(reason) {
+      if (reason === 'missing_references') return "This saree isn't set up for try-on yet.";
+      if (reason === 'not_in_rollout') return "This saree isn't in the try-on preview yet.";
+      if (reason === 'disabled') return "Try-on isn't available right now.";
+      return "This saree isn't available for try-on.";
+    }
+
     function openForProduct(p) {
       var node = bindDialog();
       if (!node) return;
-      product = p;
-      renderSaree(p);
+      product = p || {};
+      renderSaree(product);
+
+      if (!product.productGid || !product.variantGid) {
+        node._nirahhSetOpen(true);
+        showPanel(null);
+        if (els.sareeTitle && !product.title) els.sareeTitle.textContent = 'Choose a saree';
+        showNotice('Open a saree and choose See yourself in it. The homepage button does not pick one for you.', 'polite');
+        return;
+      }
 
       if (!enabled) { node._nirahhSetOpen(true); return; }
 
@@ -950,12 +965,12 @@
         .then(function (found) {
           clearStage();
           if (found.eligibility && found.eligibility.eligible === false) {
-            // PRD.md 3.6: an ineligible product should never show a try-on
-            // button at all (a catalogue check before Select photo, not a
-            // dialog error). Full grid pre-filtering is deferred; until
-            // then, this per-click fallback closes quietly rather than
-            // inventing a dialog state the design does not define.
-            node._nirahhSetOpen(false);
+            // The button is still on the page until catalogue approval and
+            // rollout catch up. Closing with no message looked like a
+            // failed click. Keep the dialog open and say why generation
+            // is not offered.
+            showPanel(null);
+            showNotice(eligibilityMessage(found.eligibility.reason), 'polite');
             return;
           }
           if (found.job) {

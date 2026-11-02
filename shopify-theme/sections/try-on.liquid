@@ -9,7 +9,9 @@
         <p class="lead">{{ section.settings.body }}</p>
       {%- endif -%}
       <button class="btn btn-solid" id="tryOnBtn" type="button" data-tryon-open aria-describedby="tryOnNotice">{{ section.settings.button_label }}</button>
+      {%- unless settings.tryon_enabled -%}
       <p class="fineprint" id="tryOnNotice"><strong>Under development — virtual try-on is not available yet.</strong></p>
+      {%- endunless -%}
       {%- if section.settings.fineprint != blank -%}
         <p class="fineprint">{{ section.settings.fineprint }}</p>
       {%- endif -%}
