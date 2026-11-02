@@ -101,6 +101,12 @@
   margin-top: .5rem;
 }
 
+/* .btn { display: inline-block } in style.css overrides the hidden attribute,
+   so Try again stayed on screen during "Waiting to start…". */
+#tryOnModal [hidden] {
+  display: none;
+}
+
 .tryon-notice {
   color: var(--ink);
 }
