@@ -362,6 +362,39 @@ test('storefront browser regressions', async (t) => {
     assert.doesNotMatch(href, /preview_theme_id/);
   });
 
+  // routes.storefront_login_url ships its own query string -- the live
+  // theme renders locale, ui_hint and region_country. Rebuilding the href
+  // from its path alone silently dropped them.
+  await t.test('rewriting the sign-in link keeps the route own parameters', async () => {
+    const page = await newPage();
+    const routeUrl = '/customer_authentication/login?return_to=%2Fproducts%2Ff-1&amp;locale=en&amp;ui_hint=full&amp;region_country=IN';
+    await gotoFixture(page, `${tryonDialogFixture(false, '165759222017')}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+        data-tryon-variant-gid="gid://shopify/ProductVariant/1"
+        data-tryon-title="Rani saree" data-tryon-url="/products/rani">Try it on</button>`);
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+    await page.evaluate((u) => {
+      document.getElementById('tryonSigninBtn').setAttribute('href', u);
+    }, routeUrl.replace(/&amp;/g, '&'));
+    await page.click('[data-tryon-open]');
+
+    const href = await page.evaluate(() => {
+      const btn = document.getElementById('tryonSigninBtn');
+      btn.addEventListener('click', (e) => e.preventDefault(), true);
+      btn.click();
+      return btn.getAttribute('href');
+    });
+
+    const params = new URL(href, 'http://nirahh.test').searchParams;
+    assert.equal(params.get('locale'), 'en', `locale was dropped: ${href}`);
+    assert.equal(params.get('ui_hint'), 'full', `ui_hint was dropped: ${href}`);
+    assert.equal(params.get('region_country'), 'IN', `region_country was dropped: ${href}`);
+    assert.match(params.get('return_to'), /preview_theme_id=165759222017/);
+    assert.equal((href.match(/return_to=/g) || []).length, 1, `return_to stacked: ${href}`);
+  });
+
   // Reopening the dialog re-runs the handler against an href it already
   // rewrote; stacked return_to params would send the shopper somewhere odd.
   await t.test('reopening the dialog does not stack return_to parameters', async () => {

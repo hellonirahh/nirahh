@@ -464,11 +464,13 @@
       if (!product) return;
       store.set(KEYS.pending, JSON.stringify(product));
       var href = els.signinBtn.getAttribute('href') || config.loginUrl || '/account/login';
-      // Strip any return_to this handler added on a previous click, so
-      // reopening the dialog does not stack them.
-      var base = href.split('?')[0];
-      els.signinBtn.setAttribute('href',
-        base + '?return_to=' + encodeURIComponent(signinReturnPath()));
+      // routes.storefront_login_url already carries locale, ui_hint and
+      // region_country; keep them. set() replaces any return_to from a
+      // previous click rather than appending a second one.
+      var parts = href.split('?');
+      var params = new URLSearchParams(parts[1] || '');
+      params.set('return_to', signinReturnPath());
+      els.signinBtn.setAttribute('href', parts[0] + '?' + params.toString());
     }
 
     // ---- session lifecycle --------------------------------------------
