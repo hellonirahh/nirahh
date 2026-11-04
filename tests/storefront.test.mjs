@@ -118,8 +118,8 @@ test('storefront browser regressions', async (t) => {
   // to match its ids/structure, following the same synthetic-contract
   // pattern already used below for the variant-sync test, since there is no
   // Shopify Liquid renderer available in CI.
-  function tryonDialogFixture(signedIn) {
-    const config = JSON.stringify({ proxyPath: '/apps/nirahh-tryon', signedIn, loginUrl: '/account/login', locale: 'en', cartRoot: '/', cartUrl: '/cart' });
+  function tryonDialogFixture(signedIn, previewThemeId) {
+    const config = JSON.stringify({ proxyPath: '/apps/nirahh-tryon', signedIn, loginUrl: '/account/login', previewThemeId: previewThemeId || '', locale: 'en', cartRoot: '/', cartUrl: '/cart' });
     return `
       <div class="modal" id="tryOnModal" hidden><div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
         <button class="modal-close" id="modalClose" aria-label="Close" type="button">&times;</button>
@@ -301,8 +301,92 @@ test('storefront browser regressions', async (t) => {
       }, { once: true });
       btn.click();
     }));
-    assert.match(href, /return_url=/);
+    // Shopify's new customer accounts take return_to, not return_url. The
+    // old param was silently dropped, landing the shopper on the account
+    // page instead of back on the saree.
+    assert.match(href, /return_to=/);
+    assert.doesNotMatch(href, /return_url=/);
     assert.match(pending, /Rani saree/);
+  });
+
+  // The reported bug: signing in from the unpublished preview returned the
+  // shopper to the primary domain, which serves the published theme, and
+  // try-on reported itself unavailable. return_to only accepts a relative
+  // path, so the draft can only be re-entered by carrying preview_theme_id.
+  await t.test('signing in from an unpublished theme returns into that same theme', async () => {
+    const page = await newPage();
+    await gotoFixture(page, `${tryonDialogFixture(false, '165759222017')}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+        data-tryon-variant-gid="gid://shopify/ProductVariant/1"
+        data-tryon-title="Rani saree" data-tryon-url="/products/rani">Try it on</button>`);
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+    await page.click('[data-tryon-open]');
+
+    await page.route('http://nirahh.test/account/login*', (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<p>login stub</p>' }));
+    const href = await page.evaluate(() => new Promise((resolve) => {
+      const btn = document.getElementById('tryonSigninBtn');
+      btn.addEventListener('click', () => resolve(btn.getAttribute('href')), { once: true });
+      btn.click();
+    }));
+
+    const returnTo = decodeURIComponent(new URL(href, 'http://nirahh.test').searchParams.get('return_to'));
+    assert.match(returnTo, /preview_theme_id=165759222017/,
+      `return_to must re-enter the draft theme, got ${returnTo}`);
+    assert.ok(returnTo.startsWith('/'), `return_to must be a relative path, got ${returnTo}`);
+  });
+
+  // On the published theme the parameter would be noise, and worse, would
+  // pin shoppers to a theme id that may later be replaced.
+  await t.test('signing in from the published theme adds no preview parameter', async () => {
+    const page = await newPage();
+    await gotoFixture(page, `${tryonDialogFixture(false, '')}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+        data-tryon-variant-gid="gid://shopify/ProductVariant/1"
+        data-tryon-title="Rani saree" data-tryon-url="/products/rani">Try it on</button>`);
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+    await page.click('[data-tryon-open]');
+
+    await page.route('http://nirahh.test/account/login*', (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<p>login stub</p>' }));
+    const href = await page.evaluate(() => new Promise((resolve) => {
+      const btn = document.getElementById('tryonSigninBtn');
+      btn.addEventListener('click', () => resolve(btn.getAttribute('href')), { once: true });
+      btn.click();
+    }));
+
+    assert.doesNotMatch(href, /preview_theme_id/);
+  });
+
+  // Reopening the dialog re-runs the handler against an href it already
+  // rewrote; stacked return_to params would send the shopper somewhere odd.
+  await t.test('reopening the dialog does not stack return_to parameters', async () => {
+    const page = await newPage();
+    await gotoFixture(page, `${tryonDialogFixture(false, '165759222017')}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+        data-tryon-variant-gid="gid://shopify/ProductVariant/1"
+        data-tryon-title="Rani saree" data-tryon-url="/products/rani">Try it on</button>`);
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+    await page.click('[data-tryon-open]');
+
+    const href = await page.evaluate(() => {
+      const btn = document.getElementById('tryonSigninBtn');
+      // The href is real, so letting the default action run would navigate
+      // away mid-test. Suppress it and still exercise the click handler.
+      btn.addEventListener('click', (e) => e.preventDefault(), true);
+      btn.click();
+      btn.click();
+      btn.click();
+      return btn.getAttribute('href');
+    });
+
+    assert.equal((href.match(/return_to=/g) || []).length, 1, `href stacked parameters: ${href}`);
   });
 
   await t.test('returning signed-in after the login redirect auto-reopens the dialog for the preserved saree', async () => {

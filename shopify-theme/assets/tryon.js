@@ -127,7 +127,7 @@
   var TryOn = (function () {
     var dialog = null;
     var enabled = false;
-    var config = { proxyPath: '', signedIn: false, loginUrl: '', locale: 'en', cartRoot: '/', cartUrl: '/cart' };
+    var config = { proxyPath: '', signedIn: false, loginUrl: '', previewThemeId: '', locale: 'en', cartRoot: '/', cartUrl: '/cart' };
     var api = null;
     var els = {};
     var session = { token: null, id: null, limits: null, consentVersion: null, featureEnabled: false, jobs: [], photos: [] };
@@ -446,13 +446,29 @@
       updateGenerateEnabled();
     }
 
+    // Build the path the shopper comes back to after signing in. Shopify's
+    // new customer accounts only accept a relative path here, so the return
+    // always lands on the store's primary domain. On a preview that means
+    // the published theme, which has no try-on -- so when this is not the
+    // published theme the path has to carry preview_theme_id to get back
+    // into the same draft.
+    function signinReturnPath() {
+      var path = window.location.pathname;
+      var params = new URLSearchParams(window.location.search);
+      if (config.previewThemeId) params.set('preview_theme_id', config.previewThemeId);
+      var query = params.toString();
+      return query ? path + '?' + query : path;
+    }
+
     function onSigninClick() {
       if (!product) return;
       store.set(KEYS.pending, JSON.stringify(product));
-      var returnTo = window.location.pathname + window.location.search;
       var href = els.signinBtn.getAttribute('href') || config.loginUrl || '/account/login';
-      var sep = href.indexOf('?') === -1 ? '?' : '&';
-      els.signinBtn.setAttribute('href', href + sep + 'return_url=' + encodeURIComponent(returnTo));
+      // Strip any return_to this handler added on a previous click, so
+      // reopening the dialog does not stack them.
+      var base = href.split('?')[0];
+      els.signinBtn.setAttribute('href',
+        base + '?return_to=' + encodeURIComponent(signinReturnPath()));
     }
 
     // ---- session lifecycle --------------------------------------------

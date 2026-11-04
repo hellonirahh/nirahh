@@ -42,12 +42,36 @@
           if customer
             assign tryon_signed_in = true
           endif
+
+          # This store uses Shopify's new customer accounts, so /account/login
+          # leaves the theme entirely for a shopify.com-hosted page and comes
+          # back via return_to. return_to only accepts a relative path, so the
+          # shopper always lands on the primary domain. On a preview that is
+          # the published theme, which has no try-on -- the shopper signs in
+          # and is told try-on is unavailable. routes.storefront_login_url is
+          # the route that returns to the originating page; fall back to
+          # account_login_url on a platform that does not expose it yet.
+          assign tryon_login_url = routes.storefront_login_url
+          if tryon_login_url == blank
+            assign tryon_login_url = routes.account_login_url
+          endif
+
+          # theme.role is 'main' only for the published theme. Anywhere else
+          # the return path has to carry preview_theme_id or the shopper comes
+          # back to the live theme. The preview share host
+          # (*.shopifypreview.com) cannot survive the round trip at all, since
+          # return_to cannot name a different host.
+          assign tryon_preview_theme_id = ''
+          unless theme.role == 'main'
+            assign tryon_preview_theme_id = theme.id
+          endunless
         -%}
         <script type="application/json" id="tryonConfig">
           {
             "proxyPath": {{ settings.tryon_proxy_path | json }},
             "signedIn": {{ tryon_signed_in | json }},
-            "loginUrl": {{ routes.account_login_url | json }},
+            "loginUrl": {{ tryon_login_url | json }},
+            "previewThemeId": {{ tryon_preview_theme_id | json }},
             "locale": {{ request.locale.iso_code | default: 'en' | json }},
             "cartRoot": {{ routes.root_url | json }},
             "cartUrl": {{ routes.cart_url | json }}
@@ -67,7 +91,7 @@
 
         <div class="tryon-panel" id="tryonSignin" hidden>
           <p class="lead">Sign in to try this on — 2 attempts per session, 5 per day.</p>
-          <a class="btn btn-solid" id="tryonSigninBtn" href="{{ routes.account_login_url }}">Sign in</a>
+          <a class="btn btn-solid" id="tryonSigninBtn" href="{{ tryon_login_url }}">Sign in</a>
         </div>
 
         <div class="tryon-panel" id="tryonPhoto" hidden>
