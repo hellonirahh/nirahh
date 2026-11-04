@@ -1,0 +1,236 @@
+/* Virtual try-on entry points (steps 24-27). Locally scoped: the shared
+   dialog itself reuses .modal/.modal-panel/.modal-close/.modal-actions and
+   the .btn/.eyebrow/.display/.lead/.fineprint type styles already defined in
+   style.css, so only the one new entry point below needs a rule here. */
+.product-try {
+  margin-top: .5rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: .62rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: color .3s ease;
+}
+.product-try:hover {
+  color: var(--ink);
+}
+
+/* Fitting-room dialog panels (step 25): session, consent and upload. */
+.tryon-saree {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin: .75rem 0 1rem;
+}
+.tryon-saree-image {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: none;
+}
+.tryon-saree-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tryon-saree-info .eyebrow {
+  margin: 0 0 .15rem;
+}
+.tryon-saree-info .lead {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tryon-guidance {
+  margin: 0 0 1rem;
+  padding-left: 1.1rem;
+}
+.tryon-guidance li {
+  margin-bottom: .25rem;
+}
+
+.tryon-preview {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 4px;
+  margin-bottom: .5rem;
+  background: var(--sand);
+}
+
+.tryon-file-label {
+  display: block;
+  font-size: .62rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: .35rem;
+}
+
+.tryon-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  font-size: .85rem;
+  line-height: 1.4;
+  color: var(--muted);
+  margin: .75rem 0;
+}
+.tryon-consent input {
+  margin-top: .2rem;
+  flex: none;
+}
+
+.tryon-progress {
+  width: 100%;
+  margin: .5rem 0;
+}
+
+.tryon-photo-actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-top: .5rem;
+}
+
+/* .btn { display: inline-block } in style.css overrides the hidden attribute,
+   so Try again stayed on screen during "Waiting to start…". */
+#tryOnModal [hidden] {
+  display: none;
+}
+
+.tryon-notice {
+  color: var(--ink);
+}
+
+/* Reusing an already-validated photo for a second saree (step 26): skips
+   the file input/consent entirely rather than hiding it visually only. */
+.tryon-reuse {
+  margin-bottom: 1rem;
+}
+.tryon-reuse .lead {
+  margin: 0 0 .5rem;
+}
+
+/* Create (queued/creating/checking) and Ready panels (step 26). */
+.tryon-result {
+  background: var(--sand);
+}
+.tryon-compare {
+  display: flex;
+  gap: .5rem;
+  margin: .5rem 0;
+}
+.tryon-compare .btn[aria-pressed="true"] {
+  color: var(--ink);
+  border-color: currentColor;
+}
+.tryon-detail-link {
+  align-self: center;
+  margin-left: auto;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  color: var(--muted);
+  text-decoration: underline;
+}
+.tryon-detail-link:hover {
+  color: var(--ink);
+}
+
+/* Generation takes tens of seconds and the model reports no percentage,
+   so the dialog shows which stage is running plus an indeterminate bar
+   rather than a number it would have to invent. */
+.tryon-steps {
+  list-style: none;
+  margin: .75rem 0 .5rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem 1.25rem;
+}
+
+.tryon-step {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: .8rem;
+  line-height: 1.6;
+  opacity: .45;
+}
+
+.tryon-step::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: .5em;
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+
+.tryon-step[data-state="done"] {
+  opacity: .7;
+}
+
+.tryon-step[data-state="done"]::before {
+  background: currentColor;
+}
+
+.tryon-step[data-state="active"] {
+  opacity: 1;
+  font-weight: 600;
+}
+
+.tryon-step[data-state="active"]::before {
+  background: currentColor;
+  animation: tryon-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes tryon-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.45); opacity: .45; }
+}
+
+.tryon-bar {
+  position: relative;
+  height: 3px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: .14;
+  margin: .25rem 0 .5rem;
+}
+
+.tryon-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  border-radius: inherit;
+  background: currentColor;
+  animation: tryon-slide 1.5s ease-in-out infinite;
+}
+
+@keyframes tryon-slide {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
+.tryon-elapsed {
+  opacity: .6;
+}
+
+/* PRD 3.4: respect a reduced-motion preference. The indicator stays
+   visible and the stage text still updates; only the motion stops. */
+@media (prefers-reduced-motion: reduce) {
+  .tryon-step[data-state="active"]::before { animation: none; }
+  .tryon-bar > span { animation: none; left: 0; width: 100%; opacity: .5; }
+}

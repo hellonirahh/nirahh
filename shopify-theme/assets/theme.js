@@ -55,7 +55,7 @@
     });
   }
 
-  // ---- See yourself in it ----------------------------------------------
+  // ---- Product variant selection -------------------------------------------
   function initVariants(scope) {
     scope.querySelectorAll('.pdp-form').forEach(function (form) {
       var select = form.querySelector('[name="id"]');
@@ -87,23 +87,10 @@
     });
   }
 
-  // The real render-the-saree-onto-your-photo backend isn't built yet, so
-  // this just opens a "coming soon" message rather than pretending to work.
-  function initTryOn() {
-    var modal = document.getElementById('tryOnModal');
-    var openBtn = document.getElementById('tryOnBtn');
-    if (!modal || modal.dataset.bound) return;
-    modal.dataset.bound = '1';
-
-    var setModal = window.NirahhDialog(modal);
-    if (openBtn) openBtn.addEventListener('click', function () { setModal(true); });
-
-    // A try-on link from a product page lands on this homepage anchor; open it.
-    if (location.hash === '#try-on') setModal(true);
-  }
-
-  // The try-on modal is not on every page, but the link from a product page is.
-  // Sending it to the section anchor is enough; nothing to bind here.
+  // The try-on dialog itself, and the click binding for every entry point
+  // that opens it, now live in assets/tryon.js (steps 24-27), since that
+  // dialog is shared sitewide from layout/theme.liquid rather than embedded
+  // in this section's own markup.
 
   function init(scope) {
     window.NirahhNavigation();
@@ -111,7 +98,6 @@
     initReveal(scope);
     initGallery(scope);
     initVariants(scope);
-    initTryOn();
   }
 
   init(document);

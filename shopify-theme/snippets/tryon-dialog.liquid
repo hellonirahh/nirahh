@@ -1,0 +1,189 @@
+{%- comment -%}
+  One shared fitting-room dialog, rendered once from layout/theme.liquid so
+  every entry point (homepage section, product card, product page) can open
+  it without navigating to a different page first. An entry point marks its
+  trigger with data-tryon-open (plus data-tryon-product-gid/-variant-gid/
+  -title/-image where it has a specific product); assets/tryon.js reads
+  those attributes into this dialog before opening it.
+
+  settings.tryon_enabled gates which panel set renders:
+  - off (default): the existing "still in the works" message, unchanged.
+  - on: the real session/consent/upload flow (step 25) plus job creation,
+    polling, comparison, download, retry, cancellation, deletion (step 26)
+    and Shopify cart integration (step 27). #tryonPhoto covers Select/Review
+    photo and either the normal upload fields (#tryonUploadFields) or, when
+    the session already has a validated photo, the reuse view (#tryonReuse)
+    that skips straight to Generate without a second upload. #tryonCreate
+    covers queued/creating/checking and, in the same panel, a job failure/
+    quality-rejection/outcome-unknown notice with its own Try again action.
+    #tryonReady covers the finished preview, Original/Preview comparison, a
+    link to the real product photos/description, Add to bag (the exact
+    product/variant the job was created for, added through Shopify's own
+    Ajax cart endpoint), Download, Try another saree and Delete. #tryonExpired
+    covers session expiry or an explicit deletion.
+
+  #tryonConfig below is read once by assets/tryon.js; it carries no
+  credential, only the non-secret values Liquid already has at render time.
+{%- endcomment -%}
+<div class="modal" id="tryOnModal" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
+    <button class="modal-close" id="modalClose" aria-label="{{ 'general.close' | t }}" type="button">&times;</button>
+
+    <div class="modal-body">
+      {%- if settings.tryon_enabled -%}
+        {%- comment -%}
+          Liquid's {{ }} output tag only evaluates variables/filters, not
+          comparison operators; `customer != blank` is only valid inside a
+          {% if %}/{% unless %} tag. Resolve the boolean with `liquid`/`assign`
+          first, matching Shopify Theme Check's LiquidHTMLSyntaxError rule.
+        {%- endcomment -%}
+        {%- liquid
+          assign tryon_signed_in = false
+          if customer
+            assign tryon_signed_in = true
+          endif
+
+          # This store uses Shopify's new customer accounts, so /account/login
+          # leaves the theme entirely for a shopify.com-hosted page and comes
+          # back via return_to. return_to only accepts a relative path, so the
+          # shopper always lands on the primary domain. On a preview that is
+          # the published theme, which has no try-on -- the shopper signs in
+          # and is told try-on is unavailable. routes.storefront_login_url is
+          # the route that returns to the originating page; fall back to
+          # account_login_url on a platform that does not expose it yet.
+          assign tryon_login_url = routes.storefront_login_url
+          if tryon_login_url == blank
+            assign tryon_login_url = routes.account_login_url
+          endif
+
+          # theme.role is 'main' only for the published theme. Anywhere else
+          # the return path has to carry preview_theme_id or the shopper comes
+          # back to the live theme. The preview share host
+          # (*.shopifypreview.com) cannot survive the round trip at all, since
+          # return_to cannot name a different host.
+          assign tryon_preview_theme_id = ''
+          unless theme.role == 'main'
+            assign tryon_preview_theme_id = theme.id
+          endunless
+        -%}
+        <script type="application/json" id="tryonConfig">
+          {
+            "proxyPath": {{ settings.tryon_proxy_path | json }},
+            "signedIn": {{ tryon_signed_in | json }},
+            "loginUrl": {{ tryon_login_url | json }},
+            "previewThemeId": {{ tryon_preview_theme_id | json }},
+            "locale": {{ request.locale.iso_code | default: 'en' | json }},
+            "cartRoot": {{ routes.root_url | json }},
+            "cartUrl": {{ routes.cart_url | json }}
+          }
+        </script>
+
+        <h3 id="tryOnTitle" class="display">Fitting room</h3>
+
+        <div class="tryon-saree" id="tryonSaree">
+          <img class="tryon-saree-image" id="tryonSareeImage" alt="" width="56" height="56" hidden>
+          <div class="tryon-saree-info">
+            <p class="eyebrow">See yourself in it</p>
+            <p class="lead" id="tryonSareeTitle"></p>
+          </div>
+          <button type="button" class="btn btn-ghost" id="tryonChangeSaree">Change saree</button>
+        </div>
+
+        <div class="tryon-panel" id="tryonSignin" hidden>
+          <p class="lead">Sign in to try this on — 2 attempts per session, 5 per day.</p>
+          <a class="btn btn-solid" id="tryonSigninBtn" href="{{ tryon_login_url }}">Sign in</a>
+        </div>
+
+        <div class="tryon-panel" id="tryonPhoto" hidden>
+          <div class="tryon-reuse" id="tryonReuse" hidden>
+            <p class="lead">Using your photo from this session.</p>
+            <button type="button" class="btn btn-ghost" id="tryonUseDifferentPhoto">Use a different photo</button>
+          </div>
+
+          <div id="tryonUploadFields">
+            <ul class="fineprint tryon-guidance">
+              <li>One consenting adult, in frame alone</li>
+              <li>Face and full body clearly visible, in natural light</li>
+              <li>Front-facing pose, arms away from the torso</li>
+            </ul>
+
+            <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" width="768" height="1024" hidden>
+            <p class="lead" id="tryonPreviewCaption" hidden>This is how you'll look in this saree.</p>
+
+            <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
+            <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
+
+            <label class="tryon-consent">
+              <input type="checkbox" id="tryonConsent">
+              I confirm this photo is of myself, that I am an adult, and I allow Nirahh and its named provider to temporarily process it to generate this preview.
+            </label>
+
+            <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
+            <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
+          </div>
+
+          <div class="tryon-photo-actions">
+            <button type="button" class="btn btn-ghost" id="tryonChangePhoto" hidden>Choose another photo</button>
+            <button type="button" class="btn btn-solid" id="tryonGenerate" disabled>Generate</button>
+          </div>
+        </div>
+
+        <div class="tryon-panel" id="tryonCreate" hidden>
+          {%- comment -%}
+            A preview takes tens of seconds. Without a visible, moving
+            indicator a single line of text reads as a frozen dialog, so
+            this shows which of the three stages is running, an
+            indeterminate bar (the model reports no percentage, so a
+            numeric one would be invented), and an elapsed count.
+          {%- endcomment -%}
+          <ol class="tryon-steps" id="tryonSteps">
+            <li class="tryon-step" data-stage="queued">Waiting to start</li>
+            <li class="tryon-step" data-stage="creating">Creating your preview</li>
+            <li class="tryon-step" data-stage="checking">Checking the result</li>
+          </ol>
+          <div class="tryon-bar" id="tryonBar" aria-hidden="true"><span></span></div>
+          <p class="fineprint" id="tryonCreateStage" aria-live="polite"></p>
+          <p class="fineprint tryon-elapsed" id="tryonElapsed" aria-hidden="true"></p>
+          <div class="tryon-photo-actions">
+            <button type="button" class="btn btn-ghost" id="tryonCancelJob">Cancel</button>
+            <button type="button" class="btn btn-ghost" id="tryonContinueShopping">Continue shopping</button>
+            <button type="button" class="btn btn-solid" id="tryonTryAgain" hidden>Try again</button>
+          </div>
+        </div>
+
+        <div class="tryon-panel" id="tryonReady" hidden>
+          <p class="lead">Here's your AI styling preview.</p>
+          <img class="tryon-preview tryon-result" id="tryonResultImg" alt="" width="768" height="1024">
+          <div class="tryon-compare" role="group" aria-label="Compare your photo and the preview">
+            <button type="button" class="btn btn-ghost" id="tryonToggleOriginal" aria-pressed="false">Original</button>
+            <button type="button" class="btn btn-ghost" id="tryonTogglePreview" aria-pressed="true">Preview</button>
+            <a class="tryon-detail-link" id="tryonProductLink" href="#" hidden>View the real product photos and description</a>
+          </div>
+          <p class="fineprint" id="tryonBlouseNote">Blouse styling shown is a suggestion; it's included only if the product description says so.</p>
+          <div class="tryon-photo-actions">
+            <button type="button" class="btn btn-ghost" id="tryonTryAnother">Try another saree</button>
+            <button type="button" class="btn btn-ghost" id="tryonDownload">Download</button>
+            <button type="button" class="btn btn-ghost" id="tryonDelete">Delete</button>
+            <button type="button" class="btn btn-solid" id="tryonAddToBag" disabled>Add to bag</button>
+          </div>
+        </div>
+
+        <div class="tryon-panel" id="tryonExpired" hidden>
+          <p class="lead">This session has ended.</p>
+          <button type="button" class="btn btn-solid" id="tryonStartNew">Start a new session</button>
+        </div>
+
+        <p class="fineprint" id="tryonCounters" aria-live="polite" hidden></p>
+        <p class="fineprint tryon-notice" id="tryonNotice" aria-live="polite" hidden></p>
+      {%- else -%}
+        <p class="eyebrow">See yourself in it</p>
+        <h3 id="tryOnTitle" class="display">This feature is still in the works.</h3>
+        <p class="lead">We're building a private, on-you preview of the Nirahh Edit. It isn't ready to launch just yet — check back soon.</p>
+        <div class="modal-actions">
+          <a class="btn btn-solid" href="{{ routes.root_url }}#the-edit">Explore the Edit</a>
+        </div>
+        <p class="fineprint">We'll let you know the moment it's ready.</p>
+      {%- endif -%}
+    </div>
+  </div>
+</div>
