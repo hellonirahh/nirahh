@@ -195,6 +195,9 @@
         notice: document.getElementById('tryonNotice'),
         create: document.getElementById('tryonCreate'),
         createStage: document.getElementById('tryonCreateStage'),
+        steps: document.getElementById('tryonSteps'),
+        bar: document.getElementById('tryonBar'),
+        elapsed: document.getElementById('tryonElapsed'),
         cancelJob: document.getElementById('tryonCancelJob'),
         continueShopping: document.getElementById('tryonContinueShopping'),
         tryAgain: document.getElementById('tryonTryAgain'),
@@ -268,6 +271,7 @@
 
     function onOpenChange(show) {
       if (show) return;
+      stopElapsed();
       if (activeController) { activeController.abort(); activeController = null; }
       // Dismissing the dialog pauses client-side polling only; the job
       // keeps running server-side (3.2 Create states) and is recovered from
@@ -292,6 +296,10 @@
       if (els.create) els.create.hidden = name !== 'create';
       if (els.ready) els.ready.hidden = name !== 'ready';
       if (els.expired) els.expired.hidden = name !== 'expired';
+      // The elapsed counter ticks on a timer; leaving the create panel
+      // for any reason must stop it, or it keeps running behind a closed
+      // dialog and resumes mid-count on the next job.
+      if (name !== 'create') stopElapsed();
     }
 
     function renderSaree(p) {
@@ -324,7 +332,46 @@
       if (stage === 'checking') return 'Checking the result\u2026';
       return null;
     }
-    function setCreateStage(text) { if (els.createStage) els.createStage.textContent = text || ''; }
+    var STAGE_ORDER = ['queued', 'creating', 'checking'];
+    var elapsedTimer = null;
+    var elapsedFrom = 0;
+
+    function renderElapsed() {
+      if (!els.elapsed) return;
+      var seconds = Math.max(0, Math.round((Date.now() - elapsedFrom) / 1000));
+      els.elapsed.textContent = seconds + 's elapsed · previews usually take under a minute';
+    }
+
+    function startElapsed() {
+      if (elapsedTimer) return;
+      elapsedFrom = Date.now();
+      renderElapsed();
+      elapsedTimer = setInterval(renderElapsed, 1000);
+    }
+
+    function stopElapsed() {
+      if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+      if (els.elapsed) els.elapsed.textContent = '';
+    }
+
+    // A preview takes tens of seconds and the model reports no progress
+    // of its own, so the dialog marks which stage is running rather than
+    // showing a percentage it would have to invent.
+    function setCreateStage(stage) {
+      var index = STAGE_ORDER.indexOf(stage);
+      if (els.createStage) els.createStage.textContent = index === -1 ? '' : stageText(stage);
+      if (els.steps) {
+        var steps = els.steps.querySelectorAll('.tryon-step');
+        for (var i = 0; i < steps.length; i++) {
+          var at = STAGE_ORDER.indexOf(steps[i].getAttribute('data-stage'));
+          steps[i].setAttribute('data-state',
+            index === -1 ? 'idle' : at < index ? 'done' : at === index ? 'active' : 'idle');
+        }
+        els.steps.hidden = index === -1;
+      }
+      if (els.bar) els.bar.hidden = index === -1;
+      if (index === -1) stopElapsed(); else startElapsed();
+    }
     function hideTryAgain() { if (els.tryAgain) els.tryAgain.hidden = true; }
 
     function showProgress(loaded, total) {
@@ -336,12 +383,44 @@
     }
     function hideProgress() { if (els.progress) els.progress.hidden = true; }
 
+    function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+    // Lead with what the shopper can actually spend. Showing the session
+    // and account-day remainders side by side read as "2 attempts left
+    // this session \u00b7 0 left today", which offered attempts that did not
+    // exist. effective_remaining_generations is the lesser of the two and
+    // is the only number that governs whether Generate works.
     function renderCounters() {
       if (!els.counters || !session.limits) return;
       var l = session.limits;
       els.counters.hidden = false;
-      var sessionWord = l.remaining_generations === 1 ? 'attempt' : 'attempts';
-      els.counters.textContent = l.remaining_generations + ' ' + sessionWord + ' left this session \u00b7 ' + l.account_generations_remaining_today + ' left today';
+
+      if (l.exempt_from_limits) {
+        els.counters.textContent = 'Unlimited previews on this account';
+        return;
+      }
+
+      var effective = typeof l.effective_remaining_generations === 'number'
+        ? l.effective_remaining_generations
+        : Math.min(l.remaining_generations, l.account_generations_remaining_today);
+
+      if (effective <= 0) {
+        // Say which allowance ran out, account-day first (PRD 3.3).
+        els.counters.textContent = l.account_generations_remaining_today <= 0
+          ? 'No previews left today'
+          : 'No previews left in this session';
+        return;
+      }
+
+      // Only mention the day's remainder when it is the tighter of the
+      // two, so the line never advertises more than `effective`.
+      var text = plural(effective, 'preview') + ' left';
+      if (l.account_generations_remaining_today > effective) {
+        text += ' in this session \u00b7 ' + l.account_generations_remaining_today + ' left today';
+      } else {
+        text += ' today';
+      }
+      els.counters.textContent = text;
     }
 
     // Server-authoritative limits drive both the counters line and whether
@@ -638,7 +717,7 @@
         showPanel('create');
         if (!capped) hideNotice();
         hideTryAgain();
-        setCreateStage(stageText(data.stage));
+        setCreateStage(data.stage);
         scheduleJobPoll(token, data.poll_after_ms);
         return;
       }
@@ -721,7 +800,7 @@
       showPanel('create');
       hideNotice();
       hideTryAgain();
-      setCreateStage(stageText('queued'));
+      setCreateStage('queued');
       var controller = newAbortController();
       api.createJob({
         session_token: session.token,
@@ -999,7 +1078,7 @@
             // placeholder until the authoritative jobStatus call below
             // replaces it (and may switch straight to the Ready panel).
             showPanel('create');
-            setCreateStage(stageText('checking'));
+            setCreateStage('checking');
             var c2 = newAbortController();
             api.jobStatus({ session_token: session.token, job_id: found.job.job_id }, c2.signal)
               .then(function (data) { handleJobStatus(data, token); })

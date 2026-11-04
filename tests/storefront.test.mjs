@@ -362,6 +362,59 @@ test('storefront browser regressions', async (t) => {
     assert.doesNotMatch(href, /preview_theme_id/);
   });
 
+  // The reported contradiction: a fresh session against a spent
+  // account-day showed "2 attempts left this session \u00b7 0 left today",
+  // offering attempts that could not be spent.
+  await t.test('a spent account-day never advertises session attempts', async () => {
+    const page = await newPage();
+    const spent = Object.assign({}, baseLimits, {
+      remaining_generations: 2,
+      account_generations_remaining_today: 0,
+      account_generations_consumed_today: 6,
+      effective_remaining_generations: 0,
+    });
+    await mockProxy(page, {
+      'session/start': () => ({ data: { session_token: 't1', session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: spent, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'session/activity': () => ({ data: { ok: true } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true }] } }),
+    });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+        data-tryon-variant-gid="gid://shopify/ProductVariant/1"
+        data-tryon-title="Rani saree" data-tryon-url="/products/rani">Try it on</button>`);
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+    await page.click('[data-tryon-open]');
+    await page.waitForFunction(() => document.getElementById('tryonCounters').textContent.length > 0, null, { timeout: 5000 });
+
+    const text = await page.locator('#tryonCounters').textContent();
+    assert.equal(text, 'No previews left today');
+    assert.doesNotMatch(text, /2/, `counter offered attempts that cannot be spent: ${text}`);
+  });
+
+  // An exempt owner account should not be shown a counter at all.
+  await t.test('an exempt account is told it has no limit', async () => {
+    const page = await newPage();
+    const exempt = Object.assign({}, baseLimits, { exempt_from_limits: true });
+    await mockProxy(page, {
+      'session/start': () => ({ data: { session_token: 't1', session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: exempt, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'session/activity': () => ({ data: { ok: true } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true }] } }),
+    });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+        data-tryon-variant-gid="gid://shopify/ProductVariant/1"
+        data-tryon-title="Rani saree" data-tryon-url="/products/rani">Try it on</button>`);
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+    await page.click('[data-tryon-open]');
+    await page.waitForFunction(() => document.getElementById('tryonCounters').textContent.length > 0, null, { timeout: 5000 });
+
+    assert.equal(await page.locator('#tryonCounters').textContent(), 'Unlimited previews on this account');
+  });
+
   // routes.storefront_login_url ships its own query string -- the live
   // theme renders locale, ui_hint and region_country. Rebuilding the href
   // from its path alone silently dropped them.
@@ -467,7 +520,7 @@ test('storefront browser regressions', async (t) => {
     await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
     assert.equal(calls[0].op, 'session/resume');
     assert.equal(calls[0].body.session_token, '2'.repeat(43));
-    assert.equal(await page.locator('#tryonCounters').textContent(), '2 attempts left this session · 5 left today');
+    assert.equal(await page.locator('#tryonCounters').textContent(), '2 previews left in this session · 5 left today');
 
     // Choosing a file alone, without checking consent, must not enable
     // Generate or reach the server: a photo never reaches the server before
@@ -854,7 +907,9 @@ test('storefront browser regressions', async (t) => {
       <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
               data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
     let resumeCalls = 0;
-    const reservedLimits = Object.assign({}, baseLimits, { generations_reserved: 1, remaining_generations: 1 });
+    // effective_remaining_generations is min(session, account-day); the
+    // server never sends a session remainder without lowering it too.
+    const reservedLimits = Object.assign({}, baseLimits, { generations_reserved: 1, remaining_generations: 1, effective_remaining_generations: 1 });
     const calls = await mockProxy(page, {
       'session/resume': () => {
         resumeCalls++;
@@ -879,7 +934,7 @@ test('storefront browser regressions', async (t) => {
     // which happens synchronously before the response arrives) before
     // reading server-refreshed counters.
     await page.waitForFunction(() => document.getElementById('tryonCreateStage').textContent === 'Creating your preview\u2026', null, { timeout: 5000 });
-    assert.equal(await page.locator('#tryonCounters').textContent(), '1 attempt left this session \u00b7 5 left today');
+    assert.equal(await page.locator('#tryonCounters').textContent(), '1 preview left in this session \u00b7 5 left today');
 
     await page.locator('#tryonContinueShopping').click();
     assert.equal(await page.locator('#tryOnModal').isVisible(), false);
@@ -891,7 +946,7 @@ test('storefront browser regressions', async (t) => {
     await page.waitForFunction(() => !document.getElementById('tryonPhoto').hidden, null, { timeout: 5000 });
     assert.equal(calls.filter((c) => c.op === 'jobs/cancel').length, 1);
     assert.equal(calls.filter((c) => c.op === 'jobs').length, 1);
-    assert.equal(await page.locator('#tryonCounters').textContent(), '2 attempts left this session \u00b7 5 left today');
+    assert.equal(await page.locator('#tryonCounters').textContent(), '2 previews left in this session \u00b7 5 left today');
   });
 
   await t.test('a failed job shows the exact PRD wording and only offers Try again when a retry is allowed', async () => {

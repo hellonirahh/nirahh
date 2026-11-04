@@ -129,7 +129,21 @@
         </div>
 
         <div class="tryon-panel" id="tryonCreate" hidden>
+          {%- comment -%}
+            A preview takes tens of seconds. Without a visible, moving
+            indicator a single line of text reads as a frozen dialog, so
+            this shows which of the three stages is running, an
+            indeterminate bar (the model reports no percentage, so a
+            numeric one would be invented), and an elapsed count.
+          {%- endcomment -%}
+          <ol class="tryon-steps" id="tryonSteps">
+            <li class="tryon-step" data-stage="queued">Waiting to start</li>
+            <li class="tryon-step" data-stage="creating">Creating your preview</li>
+            <li class="tryon-step" data-stage="checking">Checking the result</li>
+          </ol>
+          <div class="tryon-bar" id="tryonBar" aria-hidden="true"><span></span></div>
           <p class="fineprint" id="tryonCreateStage" aria-live="polite"></p>
+          <p class="fineprint tryon-elapsed" id="tryonElapsed" aria-hidden="true"></p>
           <div class="tryon-photo-actions">
             <button type="button" class="btn btn-ghost" id="tryonCancelJob">Cancel</button>
             <button type="button" class="btn btn-ghost" id="tryonContinueShopping">Continue shopping</button>
