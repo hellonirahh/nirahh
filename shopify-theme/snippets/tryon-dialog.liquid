@@ -25,7 +25,15 @@
   #tryonConfig below is read once by assets/tryon.js; it carries no
   credential, only the non-secret values Liquid already has at render time.
 {%- endcomment -%}
-<div class="modal" id="tryOnModal" hidden>
+{%- comment -%}
+  .modal--tryon (assets/tryon.css) turns the shared centred modal into a
+  docked panel: a card at the bottom-right on desktop that leaves the product
+  visible beside it, and a bottom sheet on smaller screens. dialog.js is
+  untouched -- focus trap, Escape and focus restore all still come from it.
+  Each step leads with one 3:4 photo area (the shopper's photo, then the
+  preview) and has exactly one solid primary action.
+{%- endcomment -%}
+<div class="modal modal--tryon" id="tryOnModal" hidden>
   <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
     <button class="modal-close" id="modalClose" aria-label="{{ 'general.close' | t }}" type="button">&times;</button>
 
@@ -78,7 +86,9 @@
           }
         </script>
 
-        <h3 id="tryOnTitle" class="display">Fitting room</h3>
+        <div class="tryon-head">
+          <h3 id="tryOnTitle" class="tryon-head-title">Virtual try-on</h3>
+        </div>
 
         <div class="tryon-saree" id="tryonSaree">
           <img class="tryon-saree-image" id="tryonSareeImage" alt="" width="56" height="56" hidden>
@@ -86,94 +96,136 @@
             <p class="eyebrow">See yourself in it</p>
             <p class="lead" id="tryonSareeTitle"></p>
           </div>
-          <button type="button" class="btn btn-ghost" id="tryonChangeSaree">Change saree</button>
+          <button type="button" class="tryon-link" id="tryonChangeSaree">Change saree</button>
         </div>
 
         <div class="tryon-panel" id="tryonSignin" hidden>
-          <p class="lead">Sign in to try this on — 2 attempts per session, 5 per day.</p>
-          <a class="btn btn-solid" id="tryonSigninBtn" href="{{ tryon_login_url }}">Sign in</a>
+          <div class="tryon-hero tryon-hero--intro" aria-hidden="true">
+            <span class="tryon-hero-mark"></span>
+          </div>
+          <p class="lead">Sign in to your Nirahh account to see this saree on you.</p>
+          <p class="fineprint">Previews are limited each day. You'll see how many you have left once you're signed in.</p>
+          <div class="tryon-primary">
+            <a class="btn btn-solid" id="tryonSigninBtn" href="{{ tryon_login_url }}">Sign in to try it on</a>
+          </div>
         </div>
 
         <div class="tryon-panel" id="tryonPhoto" hidden>
           <div class="tryon-reuse" id="tryonReuse" hidden>
             <p class="lead">Using your photo from this session.</p>
-            <button type="button" class="btn btn-ghost" id="tryonUseDifferentPhoto">Use a different photo</button>
+            <button type="button" class="tryon-link" id="tryonUseDifferentPhoto">Use a different photo</button>
           </div>
 
           <div id="tryonUploadFields">
+            {%- comment -%}
+              The hero is the photo the shopper chose. Before one is chosen it
+              is the upload target itself (a label for the visually hidden
+              file input, so keyboard and screen-reader users reach the real
+              control). The chips sit over the chosen photo.
+            {%- endcomment -%}
+            <div class="tryon-hero" id="tryonPhotoHero">
+              <label class="tryon-file-label tryon-drop" for="tryonFile">
+                <span class="tryon-drop-icon" aria-hidden="true"></span>
+                <span class="tryon-drop-title">Upload a full-length photo</span>
+                <span class="tryon-drop-sub">JPEG, PNG or WebP, up to 10 MB</span>
+              </label>
+              <input class="tryon-file-input" type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
+              <img class="tryon-preview tryon-hero-img" id="tryonPreview" alt="Your photo preview" width="768" height="1024" hidden>
+              <div class="tryon-chips">
+                <button type="button" class="tryon-chip" id="tryonChangePhoto" hidden>Change photo</button>
+                <span class="tryon-chip tryon-chip--quiet" id="tryonCounterChip" aria-hidden="true" hidden></span>
+              </div>
+              <div class="tryon-hero-status">
+                <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
+                <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
+              </div>
+            </div>
+
+            {%- comment -%}
+              Guidance for a photo the model can stay true to. Face detail
+              comes only from the pixels uploaded, so distance, light and no
+              zoom matter more than anything the model does afterwards.
+            {%- endcomment -%}
             <ul class="fineprint tryon-guidance">
-              <li>One consenting adult, in frame alone</li>
-              <li>Face and full body clearly visible, in natural light</li>
-              <li>Front-facing pose, arms away from the torso</li>
+              <li>Just you, head to toe in the frame</li>
+              <li>Facing the camera in soft daylight</li>
+              <li>Phone at chest height, about two metres away, with no zoom or filters</li>
+              <li>Fitted clothes help the saree follow your real shape</li>
             </ul>
-
-            <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" width="768" height="1024" hidden>
-            <p class="lead" id="tryonPreviewCaption" hidden>This is how you'll look in this saree.</p>
-
-            <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
-            <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
+            <p class="fineprint tryon-preview-caption" id="tryonPreviewCaption" hidden>Face and full body clearly visible? Confirm below and try it on.</p>
 
             <label class="tryon-consent">
               <input type="checkbox" id="tryonConsent">
               I confirm this photo is of myself, that I am an adult, and I allow Nirahh and its named provider to temporarily process it to generate this preview.
             </label>
-
-            <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
-            <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
           </div>
 
-          <div class="tryon-photo-actions">
-            <button type="button" class="btn btn-ghost" id="tryonChangePhoto" hidden>Choose another photo</button>
-            <button type="button" class="btn btn-solid" id="tryonGenerate" disabled>Generate</button>
+          <div class="tryon-primary">
+            <button type="button" class="btn btn-solid" id="tryonGenerate" disabled>Try it on</button>
           </div>
         </div>
 
         <div class="tryon-panel" id="tryonCreate" hidden>
           {%- comment -%}
-            A preview takes tens of seconds. Without a visible, moving
-            indicator a single line of text reads as a frozen dialog, so
-            this shows which of the three stages is running, an
-            indeterminate bar (the model reports no percentage, so a
-            numeric one would be invented), and an elapsed count.
+            A preview takes tens of seconds and the model reports no
+            percentage, so this shows the shopper's own photo under a soft
+            shimmer, which real stage is running, and an elapsed count --
+            never an invented percentage. Only stages the backend actually
+            passes through are listed.
           {%- endcomment -%}
+          <div class="tryon-hero tryon-hero--working">
+            <img class="tryon-hero-img" id="tryonCreateImg" alt="" width="768" height="1024" hidden>
+            <span class="tryon-shimmer" aria-hidden="true"></span>
+            <div class="tryon-hero-status">
+              <p class="tryon-hero-stage" id="tryonCreateStage" aria-live="polite"></p>
+              <p class="tryon-elapsed" id="tryonElapsed" aria-hidden="true"></p>
+            </div>
+          </div>
           <ol class="tryon-steps" id="tryonSteps">
-            <li class="tryon-step" data-stage="queued">Waiting to start</li>
+            <li class="tryon-step" data-stage="photo">Checking your photo</li>
             <li class="tryon-step" data-stage="creating">Creating your preview</li>
-            <li class="tryon-step" data-stage="checking">Checking the result</li>
+            <li class="tryon-step" data-stage="ready">Ready</li>
           </ol>
           <div class="tryon-bar" id="tryonBar" aria-hidden="true"><span></span></div>
-          <p class="fineprint" id="tryonCreateStage" aria-live="polite"></p>
-          <p class="fineprint tryon-elapsed" id="tryonElapsed" aria-hidden="true"></p>
-          <div class="tryon-photo-actions">
-            <button type="button" class="btn btn-ghost" id="tryonCancelJob">Cancel</button>
-            <button type="button" class="btn btn-ghost" id="tryonContinueShopping">Continue shopping</button>
+          <div class="tryon-primary">
             <button type="button" class="btn btn-solid" id="tryonTryAgain" hidden>Try again</button>
+          </div>
+          <div class="tryon-secondary">
+            <button type="button" class="tryon-link" id="tryonCancelJob">Cancel</button>
+            <button type="button" class="tryon-link" id="tryonContinueShopping">Continue shopping</button>
           </div>
         </div>
 
         <div class="tryon-panel" id="tryonReady" hidden>
-          <p class="lead">Here's your AI styling preview.</p>
-          <img class="tryon-preview tryon-result" id="tryonResultImg" alt="" width="768" height="1024">
-          <div class="tryon-compare" role="group" aria-label="Compare your photo and the preview">
-            <button type="button" class="btn btn-ghost" id="tryonToggleOriginal" aria-pressed="false">Original</button>
-            <button type="button" class="btn btn-ghost" id="tryonTogglePreview" aria-pressed="true">Preview</button>
-            <a class="tryon-detail-link" id="tryonProductLink" href="#" hidden>View the real product photos and description</a>
+          <div class="tryon-hero tryon-hero--result">
+            <img class="tryon-preview tryon-result tryon-hero-img" id="tryonResultImg" alt="" width="768" height="1024">
+            <div class="tryon-chips">
+              <div class="tryon-compare tryon-segment" role="group" aria-label="Compare your photo and the preview">
+                <button type="button" class="tryon-segment-btn" id="tryonToggleOriginal" aria-pressed="false">Original</button>
+                <button type="button" class="tryon-segment-btn" id="tryonTogglePreview" aria-pressed="true">Preview</button>
+              </div>
+            </div>
           </div>
-          <p class="fineprint" id="tryonBlouseNote">Blouse styling shown is a suggestion; it's included only if the product description says so.</p>
-          <div class="tryon-photo-actions">
-            <button type="button" class="btn btn-ghost" id="tryonTryAnother">Try another saree</button>
-            <button type="button" class="btn btn-ghost" id="tryonDownload">Download</button>
-            <button type="button" class="btn btn-ghost" id="tryonDelete">Delete</button>
+          <p class="fineprint" id="tryonBlouseNote">An AI styling preview. Blouse styling shown is a suggestion; it's included only if the product description says so.</p>
+          <div class="tryon-primary">
             <button type="button" class="btn btn-solid" id="tryonAddToBag" disabled>Add to bag</button>
+          </div>
+          <div class="tryon-secondary">
+            <button type="button" class="tryon-link" id="tryonTryAnother">Try another saree</button>
+            <button type="button" class="tryon-link" id="tryonDownload">Download</button>
+            <button type="button" class="tryon-link" id="tryonDelete">Delete</button>
+            <a class="tryon-link tryon-detail-link" id="tryonProductLink" href="#" hidden>Product details</a>
           </div>
         </div>
 
         <div class="tryon-panel" id="tryonExpired" hidden>
           <p class="lead">This session has ended.</p>
-          <button type="button" class="btn btn-solid" id="tryonStartNew">Start a new session</button>
+          <div class="tryon-primary">
+            <button type="button" class="btn btn-solid" id="tryonStartNew">Start a new session</button>
+          </div>
         </div>
 
-        <p class="fineprint" id="tryonCounters" aria-live="polite" hidden></p>
+        <p class="fineprint tryon-counters" id="tryonCounters" aria-live="polite" hidden></p>
         <p class="fineprint tryon-notice" id="tryonNotice" aria-live="polite" hidden></p>
       {%- else -%}
         <p class="eyebrow">See yourself in it</p>

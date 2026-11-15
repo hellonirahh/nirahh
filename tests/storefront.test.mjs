@@ -132,7 +132,7 @@ test('storefront browser regressions', async (t) => {
             <button type="button" class="btn btn-ghost" id="tryonChangeSaree">Change saree</button>
           </div>
           <div class="tryon-panel" id="tryonSignin" hidden>
-            <p class="lead">Sign in to try this on — 2 attempts per session, 5 per day.</p>
+            <p class="lead">Sign in to your Nirahh account to see this saree on you.</p>
             <a class="btn btn-solid" id="tryonSigninBtn" href="/account/login">Sign in</a>
           </div>
           <div class="tryon-panel" id="tryonPhoto" hidden>
@@ -142,21 +142,34 @@ test('storefront browser regressions', async (t) => {
             </div>
             <div id="tryonUploadFields">
               <ul class="fineprint tryon-guidance"><li>guidance</li></ul>
-              <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" hidden>
+              <div class="tryon-hero" id="tryonPhotoHero">
+                <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
+                <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
+                <img class="tryon-preview" id="tryonPreview" alt="Your photo preview" hidden>
+                <button type="button" class="tryon-chip" id="tryonChangePhoto" hidden>Change photo</button>
+                <span class="tryon-chip" id="tryonCounterChip" aria-hidden="true" hidden></span>
+                <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
+                <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
+              </div>
               <p class="lead" id="tryonPreviewCaption" hidden>Preview</p>
-              <label class="tryon-file-label" for="tryonFile">Choose a photo</label>
-              <input type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
               <label class="tryon-consent"><input type="checkbox" id="tryonConsent"> I consent</label>
-              <progress class="tryon-progress" id="tryonProgress" value="0" max="100" hidden></progress>
-              <p class="fineprint" id="tryonStage" aria-live="polite" hidden></p>
             </div>
-            <div class="tryon-photo-actions">
-              <button type="button" class="btn btn-ghost" id="tryonChangePhoto" hidden>Choose another photo</button>
-              <button type="button" class="btn btn-solid" id="tryonGenerate" disabled>Generate</button>
+            <div class="tryon-primary">
+              <button type="button" class="btn btn-solid" id="tryonGenerate" disabled>Try it on</button>
             </div>
           </div>
           <div class="tryon-panel" id="tryonCreate" hidden>
-            <p class="fineprint" id="tryonCreateStage" aria-live="polite"></p>
+            <div class="tryon-hero">
+              <img id="tryonCreateImg" alt="" hidden>
+              <p class="tryon-hero-stage" id="tryonCreateStage" aria-live="polite"></p>
+              <p class="tryon-elapsed" id="tryonElapsed" aria-hidden="true"></p>
+            </div>
+            <ol class="tryon-steps" id="tryonSteps">
+              <li class="tryon-step" data-stage="photo">Checking your photo</li>
+              <li class="tryon-step" data-stage="creating">Creating your preview</li>
+              <li class="tryon-step" data-stage="ready">Ready</li>
+            </ol>
+            <div class="tryon-bar" id="tryonBar" aria-hidden="true"><span></span></div>
             <div class="tryon-photo-actions">
               <button type="button" class="btn btn-ghost" id="tryonCancelJob">Cancel</button>
               <button type="button" class="btn btn-ghost" id="tryonContinueShopping">Continue shopping</button>
@@ -371,6 +384,7 @@ test('storefront browser regressions', async (t) => {
       remaining_generations: 2,
       account_generations_remaining_today: 0,
       account_generations_consumed_today: 6,
+      max_generations_per_account_per_day: 6,
       effective_remaining_generations: 0,
     });
     await mockProxy(page, {
@@ -391,6 +405,11 @@ test('storefront browser regressions', async (t) => {
     const text = await page.locator('#tryonCounters').textContent();
     assert.equal(text, 'No previews left today');
     assert.doesNotMatch(text, /2/, `counter offered attempts that cannot be spent: ${text}`);
+    assert.equal(await page.locator('#tryonCounterChip').textContent(), 'No previews left today');
+    // The daily allowance in the notice is the server's number. It was a
+    // hard-coded 5 after the allowance had moved to 6.
+    const notice = await page.locator('#tryonNotice').textContent();
+    assert.match(notice, /today's 6 previews/);
   });
 
   // An exempt owner account should not be shown a counter at all.
@@ -413,6 +432,8 @@ test('storefront browser regressions', async (t) => {
     await page.waitForFunction(() => document.getElementById('tryonCounters').textContent.length > 0, null, { timeout: 5000 });
 
     assert.equal(await page.locator('#tryonCounters').textContent(), 'Unlimited previews on this account');
+    assert.equal(await page.locator('#tryonCounterChip').textContent(), 'Unlimited previews');
+    assert.equal(await page.locator('#tryonCounterChip').isHidden(), false);
   });
 
   // routes.storefront_login_url ships its own query string -- the live
@@ -603,6 +624,46 @@ test('storefront browser regressions', async (t) => {
     await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
     assert.equal(calls.find((c) => c.op === 'jobs').body.photo_id, 'p1');
     await page.waitForFunction(() => document.getElementById('tryonCreateStage').textContent === 'Creating your preview\u2026', null, { timeout: 5000 });
+    // Only real stages: the photo check is already behind the shopper, the
+    // model step is running, and nothing claims a "checking the result"
+    // stage the backend never enters.
+    assert.deepEqual(await page.$$eval('#tryonSteps .tryon-step', (steps) => steps.map((s) => [s.dataset.stage, s.dataset.state])),
+      [['photo', 'done'], ['creating', 'active'], ['ready', 'idle']]);
+    // The generating view shows the shopper's own chosen photo.
+    // (The fixture's four-byte "photo" never decodes, so check the
+    // attribute rather than rendered visibility.)
+    assert.match(await page.locator('#tryonCreateImg').getAttribute('src'), /^blob:/);
+    assert.equal(await page.locator('#tryonCreateImg').getAttribute('hidden'), null);
+  });
+
+  await t.test('a queued job reads as the model step, not a separate wait', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', '9'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [{ photo_id: 'p1' }], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'jobs': () => ({ data: { job_id: 'j9', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => ({ data: { job_id: 'j9', status: 'queued', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', deadline_at: '2026-11-01T01:03:00Z', stage: 'queued', retry_allowed: false, poll_after_ms: 60000, limits: baseLimits } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonGenerate').disabled, null, { timeout: 5000 });
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+    await page.waitForFunction(() => document.getElementById('tryonCreateStage').textContent.length > 0, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonCreateStage').textContent(), 'Creating your preview\u2026');
+    assert.equal(await page.locator('#tryonSteps [data-stage="creating"]').getAttribute('data-state'), 'active');
+    // A reused photo has no local file and this status carries no
+    // original, so the photo area stays a plain panel rather than showing
+    // a broken image.
+    assert.notEqual(await page.locator('#tryonCreateImg').getAttribute('hidden'), null);
   });
 
   await t.test('a network failure during upload shows the generic safe notice and lets the shopper retry', async () => {
@@ -932,8 +993,9 @@ test('storefront browser regressions', async (t) => {
     await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
     // Wait for the createJob/jobStatus round trip (not just the panel swap,
     // which happens synchronously before the response arrives) before
-    // reading server-refreshed counters.
-    await page.waitForFunction(() => document.getElementById('tryonCreateStage').textContent === 'Creating your preview\u2026', null, { timeout: 5000 });
+    // reading server-refreshed counters. Queued and processing share one
+    // stage label now, so the counters themselves are the signal.
+    await page.waitForFunction(() => document.getElementById('tryonCounters').textContent.startsWith('1 preview'), null, { timeout: 5000 });
     assert.equal(await page.locator('#tryonCounters').textContent(), '1 preview left in this session \u00b7 5 left today');
 
     await page.locator('#tryonContinueShopping').click();
@@ -1102,6 +1164,31 @@ test('storefront browser regressions', async (t) => {
     assert.equal(await page.locator('[name=add]').isEnabled(), true);
     assert.deepEqual(errors, []);
   });
+});
+
+// The browser tests above drive a hand-built copy of the dialog, so this
+// checks the real snippet for what that copy cannot: one solid primary
+// action per step with the right label, only real stages, the docked-panel
+// modifier, and no allowance numbers baked into copy.
+test('fitting-room snippet keeps one primary action per step and honest copy', () => {
+  const liquid = fs.readFileSync(path.join(root, 'shopify-theme/snippets/tryon-dialog.liquid'), 'utf8');
+  const enabled = liquid.split('{%- else -%}')[0];
+  assert.match(liquid, /class="modal modal--tryon" id="tryOnModal"/);
+  const panel = (id) => {
+    const start = enabled.indexOf(`id="${id}"`);
+    assert.notEqual(start, -1, id);
+    const next = enabled.indexOf('class="tryon-panel"', start + 1);
+    return enabled.slice(start, next === -1 ? undefined : next);
+  };
+  const solids = (html) => Array.from(html.matchAll(/class="btn btn-solid"[^>]*>([^<]+)</g), (m) => m[1].trim());
+  assert.deepEqual(solids(panel('tryonSignin')), ['Sign in to try it on']);
+  assert.deepEqual(solids(panel('tryonPhoto')), ['Try it on']);
+  assert.deepEqual(solids(panel('tryonCreate')), ['Try again']);
+  assert.deepEqual(solids(panel('tryonReady')), ['Add to bag']);
+  assert.deepEqual(solids(panel('tryonExpired')), ['Start a new session']);
+  assert.doesNotMatch(enabled, /Waiting to start|Checking the result/);
+  assert.doesNotMatch(enabled, /\d+\s+(attempts?|previews?)\s+per\s+(session|day)/i);
+  for (const id of ['tryonCreateImg', 'tryonCounterChip', 'tryonFile', 'tryonResultImg']) assert.match(enabled, new RegExp(`id="${id}"`));
 });
 
 test('shared dialog code and theme schemas stay valid', () => {

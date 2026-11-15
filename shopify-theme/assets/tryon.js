@@ -194,6 +194,8 @@
         counters: document.getElementById('tryonCounters'),
         notice: document.getElementById('tryonNotice'),
         create: document.getElementById('tryonCreate'),
+        createImg: document.getElementById('tryonCreateImg'),
+        counterChip: document.getElementById('tryonCounterChip'),
         createStage: document.getElementById('tryonCreateStage'),
         steps: document.getElementById('tryonSteps'),
         bar: document.getElementById('tryonBar'),
@@ -326,13 +328,20 @@
     }
     function clearStage() { setStage(null); }
 
+    // Only stages the backend really passes through are shown. The photo
+    // check finishes before a job exists, so on this panel it is already
+    // done; queued, processing and the (currently unused) checking state all
+    // read as the one model step, rather than a "Waiting to start" stage
+    // that only measured the dispatcher, or a "Checking the result" stage
+    // the backend never entered.
     function stageText(stage) {
-      if (stage === 'queued') return 'Waiting to start\u2026';
-      if (stage === 'creating') return 'Creating your preview\u2026';
-      if (stage === 'checking') return 'Checking the result\u2026';
+      if (stage === 'queued' || stage === 'creating' || stage === 'checking') return 'Creating your preview\u2026';
       return null;
     }
-    var STAGE_ORDER = ['queued', 'creating', 'checking'];
+    function displayStage(stage) {
+      return stageText(stage) ? 'creating' : null;
+    }
+    var STAGE_ORDER = ['photo', 'creating', 'ready'];
     var elapsedTimer = null;
     var elapsedFrom = 0;
 
@@ -358,7 +367,7 @@
     // of its own, so the dialog marks which stage is running rather than
     // showing a percentage it would have to invent.
     function setCreateStage(stage) {
-      var index = STAGE_ORDER.indexOf(stage);
+      var index = STAGE_ORDER.indexOf(displayStage(stage));
       if (els.createStage) els.createStage.textContent = index === -1 ? '' : stageText(stage);
       if (els.steps) {
         var steps = els.steps.querySelectorAll('.tryon-step');
@@ -370,6 +379,9 @@
         els.steps.hidden = index === -1;
       }
       if (els.bar) els.bar.hidden = index === -1;
+      // The shimmer over the photo means "still working"; a failure notice
+      // shown in this same panel must not keep it moving.
+      if (els.create) els.create.dataset.working = index === -1 ? 'false' : 'true';
       if (index === -1) stopElapsed(); else startElapsed();
     }
     function hideTryAgain() { if (els.tryAgain) els.tryAgain.hidden = true; }
@@ -390,6 +402,14 @@
     // this session \u00b7 0 left today", which offered attempts that did not
     // exist. effective_remaining_generations is the lesser of the two and
     // is the only number that governs whether Generate works.
+    // The chip over the photo carries the short form of the same number;
+    // #tryonCounters stays the full, announced line.
+    function setCounterChip(text) {
+      if (!els.counterChip) return;
+      els.counterChip.textContent = text || '';
+      els.counterChip.hidden = !text;
+    }
+
     function renderCounters() {
       if (!els.counters || !session.limits) return;
       var l = session.limits;
@@ -397,6 +417,7 @@
 
       if (l.exempt_from_limits) {
         els.counters.textContent = 'Unlimited previews on this account';
+        setCounterChip('Unlimited previews');
         return;
       }
 
@@ -409,8 +430,10 @@
         els.counters.textContent = l.account_generations_remaining_today <= 0
           ? 'No previews left today'
           : 'No previews left in this session';
+        setCounterChip(els.counters.textContent);
         return;
       }
+      setCounterChip(plural(effective, 'preview') + ' left');
 
       // Only mention the day's remainder when it is the tighter of the
       // two, so the line never advertises more than `effective`.
@@ -421,6 +444,15 @@
         text += ' today';
       }
       els.counters.textContent = text;
+    }
+
+    // The daily allowance is the server's number, not a literal: it was
+    // hard-coded as 5 here after the account-day allowance had moved to 6.
+    function dailyLimitMessage(limits) {
+      var max = limits && limits.max_generations_per_account_per_day;
+      var used = typeof max === 'number' && max > 0 ? "today's " + plural(max, 'preview') : "today's previews";
+      var when = limits && limits.account_quota_resets_at ? formatIST(limits.account_quota_resets_at) : null;
+      return "You've used " + used + ' across your account.' + (when ? ' More open at ' + when + ' tonight.' : ' More open tonight.');
     }
 
     // Server-authoritative limits drive both the counters line and whether
@@ -436,7 +468,7 @@
       if (els.tryAnother) els.tryAnother.disabled = capped;
       if (capped) {
         if (limits.account_generations_remaining_today <= 0) {
-          showNotice("You've used today's 5 previews across your account. More open at " + formatIST(limits.account_quota_resets_at) + ' tonight.', 'polite');
+          showNotice(dailyLimitMessage(limits), 'polite');
         } else {
           showNotice("You've used both previews for this session.", 'polite');
         }
@@ -454,6 +486,7 @@
       pendingFile = null;
       uploadId = null;
       if (els.preview) { els.preview.removeAttribute('src'); els.preview.hidden = true; }
+      if (els.photo) delete els.photo.dataset.hasPhoto;
       if (els.previewCaption) els.previewCaption.hidden = true;
       if (els.changePhoto) els.changePhoto.hidden = true;
       if (els.consent) els.consent.checked = false;
@@ -477,6 +510,7 @@
       pendingFile = null;
       if (els.preview) { els.preview.removeAttribute('src'); els.preview.hidden = true; }
       if (els.resultImg) { els.resultImg.removeAttribute('src'); els.resultImg.setAttribute('alt', ''); }
+      setCreateImage(null);
       latestOriginal = null;
       latestResult = null;
       readyVariantGid = null;
@@ -510,6 +544,7 @@
       pendingFile = file;
       pendingObjectUrl = URL.createObjectURL(file);
       if (els.preview) { els.preview.src = pendingObjectUrl; els.preview.hidden = false; }
+      if (els.photo) els.photo.dataset.hasPhoto = '1';
       if (els.previewCaption) els.previewCaption.hidden = false;
       if (els.changePhoto) els.changePhoto.hidden = false;
       hideNotice();
@@ -663,8 +698,7 @@
       if (err.code === 'JOB_LIMIT_REACHED') { showNotice('Another preview is being created right now. Try again in a moment.', 'polite'); return; }
       if (err.code === 'SESSION_GENERATION_LIMIT_REACHED') { showNotice("You've used both previews for this session.", 'polite'); return; }
       if (err.code === 'ACCOUNT_DAILY_GENERATION_LIMIT_REACHED') {
-        var when = err.limits ? formatIST(err.limits.account_quota_resets_at) : 'tonight';
-        showNotice("You've used today's 5 previews across your account. More open at " + when + ' tonight.', 'polite');
+        showNotice(dailyLimitMessage(err.limits), 'polite');
         return;
       }
       if (JOB_FAILURE_MESSAGES[err.code]) { showNotice(JOB_FAILURE_MESSAGES[err.code], 'assertive'); return; }
@@ -717,6 +751,9 @@
         showPanel('create');
         if (!capped) hideNotice();
         hideTryAgain();
+        if (els.createImg && els.createImg.hidden && data.original && (data.original.url || data.original.result_url)) {
+          setCreateImage(data.original.url || data.original.result_url);
+        }
         setCreateStage(data.stage);
         scheduleJobPoll(token, data.poll_after_ms);
         return;
@@ -793,6 +830,15 @@
       els.resultImg.alt = usingOriginal ? 'Your original photo' : (asset.label || 'Your AI styling preview');
     }
 
+    // The generating view shows the shopper's own photo: the local file
+    // they just chose, or the server's authorized original for a reused
+    // photo or a resumed job. With neither, the hero stays a plain panel.
+    function setCreateImage(url) {
+      if (!els.createImg) return;
+      if (url) { els.createImg.src = url; els.createImg.hidden = false; }
+      else { els.createImg.removeAttribute('src'); els.createImg.hidden = true; }
+    }
+
     function submitJob(photoId) {
       var key = jobKey(product);
       var idempotencyKey = ensureIdempotencyKey(key);
@@ -800,6 +846,7 @@
       showPanel('create');
       hideNotice();
       hideTryAgain();
+      setCreateImage(pendingObjectUrl);
       setCreateStage('queued');
       var controller = newAbortController();
       api.createJob({

@@ -14,7 +14,8 @@
       "one_piece": "One piece only",
       "in_stock": "in stock",
       "view_details": "View details",
-      "try_on": "See yourself in it"
+      "try_on": "See yourself in it",
+      "try_on_button": "Virtual try-on"
     }
   },
   "cart": {
