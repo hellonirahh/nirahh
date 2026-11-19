@@ -886,6 +886,9 @@
         setStage('Checking your photo\u2026');
         return api.uploadComplete({ session_token: session.token, upload_id: uploadId }, controller.signal);
       }).then(function (accepted) {
+        // Validation usually finishes inside uploads/complete, which then
+        // reports the outcome itself; only an unfinished one needs polling.
+        if (accepted.status === 'ready' || accepted.status === 'rejected') return accepted;
         return pollUploadStatus(accepted.poll_after_ms, controller.signal);
       }).then(function (statusData) {
         clearStage();

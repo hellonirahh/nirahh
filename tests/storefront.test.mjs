@@ -592,6 +592,66 @@ test('storefront browser regressions', async (t) => {
     assert.equal(await page.locator('#tryonPreview').isVisible(), false);
   });
 
+  await t.test('when uploads/complete already reports the outcome, the preview starts without a status poll', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'q'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'uploads/prepare': () => ({ data: { upload_id: 'u3', method: 'POST', upload_url: 'http://nirahh.test/upload-sink', fields: { key: 'k' }, expires_at: '2026-11-01T01:05:00Z', max_bytes: 10485760 } }),
+      'uploads/complete': () => ({ data: { upload_id: 'u3', status: 'ready', photo_id: 'p3', poll_after_ms: 1000 } }),
+      'uploads/status': () => ({ data: { upload_id: 'u3', status: 'ready', photo_id: 'p3' } }),
+      'jobs': () => ({ data: { job_id: 'j3', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => ({ data: { job_id: 'j3', status: 'processing', product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', deadline_at: '2026-11-01T01:03:00Z', stage: 'creating', retry_allowed: false, poll_after_ms: 60000, limits: baseLimits } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonConsent').check();
+    await page.locator('#tryonGenerate').click();
+
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+    assert.equal(calls.find((c) => c.op === 'jobs').body.photo_id, 'p3');
+    assert.equal(calls.some((c) => c.op === 'uploads/status'), false);
+  });
+
+  await t.test('when uploads/complete already reports a rejection, it is shown without a status poll', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'r'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/1"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/1" data-tryon-title="Rani saree">Try on</button>`);
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [], jobs: [] } }),
+      'products/eligibility': () => ({ data: { items: [{ product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/1', eligible: true, reason: 'approved' }] } }),
+      'session/activity': () => ({ data: {} }),
+      'uploads/prepare': () => ({ data: { upload_id: 'u4', method: 'POST', upload_url: 'http://nirahh.test/upload-sink', fields: { key: 'k' }, expires_at: '2026-11-01T01:05:00Z', max_bytes: 10485760 } }),
+      'uploads/complete': () => ({ data: { upload_id: 'u4', status: 'rejected', reason: 'PHOTO_UNSUITABLE', poll_after_ms: 1000 } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonConsent').check();
+    await page.locator('#tryonGenerate').click();
+
+    await page.waitForFunction(() => !document.getElementById('tryonNotice').hidden, null, { timeout: 5000 });
+    assert.equal(await page.locator('#tryonNotice').textContent(), "We couldn't use that photo. Make sure your face and full body are clearly visible in good light.");
+    assert.equal(calls.some((c) => c.op === 'uploads/status'), false);
+    assert.equal(calls.some((c) => c.op === 'jobs'), false);
+  });
+
   await t.test('a photo that passes validation proceeds straight into job creation (step 26) instead of stopping at a stub', async () => {
     const page = await newPage();
     await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', '4'.repeat(43)); });
