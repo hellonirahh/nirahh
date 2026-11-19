@@ -176,7 +176,6 @@
         saree: document.getElementById('tryonSaree'),
         sareeImage: document.getElementById('tryonSareeImage'),
         sareeTitle: document.getElementById('tryonSareeTitle'),
-        changeSaree: document.getElementById('tryonChangeSaree'),
         signin: document.getElementById('tryonSignin'),
         signinBtn: document.getElementById('tryonSigninBtn'),
         photo: document.getElementById('tryonPhoto'),
@@ -207,11 +206,9 @@
         resultImg: document.getElementById('tryonResultImg'),
         toggleOriginal: document.getElementById('tryonToggleOriginal'),
         togglePreview: document.getElementById('tryonTogglePreview'),
-        tryAnother: document.getElementById('tryonTryAnother'),
         download: document.getElementById('tryonDownload'),
         deleteBtn: document.getElementById('tryonDelete'),
         addToBag: document.getElementById('tryonAddToBag'),
-        productLink: document.getElementById('tryonProductLink'),
         expired: document.getElementById('tryonExpired'),
         startNew: document.getElementById('tryonStartNew')
       };
@@ -257,14 +254,12 @@
       if (els.changePhoto) els.changePhoto.addEventListener('click', onChangePhotoClick);
       if (els.useDifferentPhoto) els.useDifferentPhoto.addEventListener('click', onUseDifferentPhotoClick);
       if (els.generate) els.generate.addEventListener('click', onGenerateClick);
-      if (els.changeSaree) els.changeSaree.addEventListener('click', function () { dialog._nirahhSetOpen(false); });
       if (els.signinBtn) els.signinBtn.addEventListener('click', onSigninClick);
       if (els.cancelJob) els.cancelJob.addEventListener('click', onCancelJobClick);
       if (els.continueShopping) els.continueShopping.addEventListener('click', function () { dialog._nirahhSetOpen(false); });
       if (els.tryAgain) els.tryAgain.addEventListener('click', onTryAgainClick);
       if (els.toggleOriginal) els.toggleOriginal.addEventListener('click', function () { setComparison('original'); });
       if (els.togglePreview) els.togglePreview.addEventListener('click', function () { setComparison('preview'); });
-      if (els.tryAnother) els.tryAnother.addEventListener('click', function () { dialog._nirahhSetOpen(false); });
       if (els.download) els.download.addEventListener('click', onDownloadClick);
       if (els.deleteBtn) els.deleteBtn.addEventListener('click', onDeleteClick);
       if (els.addToBag) els.addToBag.addEventListener('click', onAddToBagClick);
@@ -456,16 +451,15 @@
     }
 
     // Server-authoritative limits drive both the counters line and whether
-    // Generate/Try another saree stay enabled; local state is never
-    // authoritative (3.3). Account-day exhaustion is shown ahead of session
-    // exhaustion when both are true.
+    // Generate stays enabled; local state is never authoritative (3.3).
+    // Account-day exhaustion is shown ahead of session exhaustion when both
+    // are true.
     function applyLimits(limits) {
       if (!limits) return;
       session.limits = limits;
       renderCounters();
       capped = limits.effective_remaining_generations <= 0;
       updateGenerateEnabled();
-      if (els.tryAnother) els.tryAnother.disabled = capped;
       if (capped) {
         if (limits.account_generations_remaining_today <= 0) {
           showNotice(dailyLimitMessage(limits), 'polite');
@@ -514,7 +508,6 @@
       latestOriginal = null;
       latestResult = null;
       readyVariantGid = null;
-      if (els.productLink) els.productLink.hidden = true;
       if (els.addToBag) els.addToBag.disabled = true;
       reusablePhotoId = null;
       photoMode = 'new';
@@ -801,23 +794,7 @@
       readyVariantGid = data.variant_gid || (product && product.variantGid) || null;
       showPanel('ready');
       setComparison('preview');
-      updateProductLink();
       if (els.addToBag) els.addToBag.disabled = !numericIdFromGid(readyVariantGid);
-    }
-
-    // The garment detail link always points at the real product page for
-    // whichever product this dialog currently represents (3.1 Comparison:
-    // "pointing at the real product photo and description"). Hidden when an
-    // entry point did not carry a URL (e.g. the homepage CTA has no single
-    // product) rather than guessing one.
-    function updateProductLink() {
-      if (!els.productLink) return;
-      if (product && product.url) {
-        els.productLink.href = product.url;
-        els.productLink.hidden = false;
-      } else {
-        els.productLink.hidden = true;
-      }
     }
 
     function setComparison(which) {
@@ -1080,7 +1057,6 @@
       reusablePhotoId = null;
       currentJobId = null;
       readyVariantGid = null;
-      if (els.productLink) els.productLink.hidden = true;
       if (els.addToBag) els.addToBag.disabled = true;
       resetPhotoPanel();
       updatePhotoModeView();
@@ -1097,6 +1073,8 @@
       ensureSession(controller.signal)
         .then(function () {
           api.sessionActivity({ session_token: session.token, action: 'select_product' }, controller.signal).catch(function () {});
+          // session/resume lists photos oldest first, so the last one is
+          // the photo the shopper chose most recently.
           if (session.photos.length) {
             reusablePhotoId = session.photos[session.photos.length - 1].photo_id;
             photoMode = 'reuse';

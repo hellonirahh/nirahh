@@ -114,7 +114,7 @@
                   data-tryon-url="{{ product.url }}"
                   {%- if product.featured_image %} data-tryon-image="{{ product.featured_image | image_url: width: 200 }}"{% endif %}>
             <span class="pdp-try-icon" aria-hidden="true"></span>
-            {{ 'products.product.try_on_button' | t }}
+            {{ 'products.product.try_on' | t }}
           </button>
         {%- endif -%}
       </div>

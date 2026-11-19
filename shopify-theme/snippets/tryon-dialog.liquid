@@ -16,19 +16,20 @@
     that skips straight to Generate without a second upload. #tryonCreate
     covers queued/creating/checking and, in the same panel, a job failure/
     quality-rejection/outcome-unknown notice with its own Try again action.
-    #tryonReady covers the finished preview, Original/Preview comparison, a
-    link to the real product photos/description, Add to bag (the exact
-    product/variant the job was created for, added through Shopify's own
-    Ajax cart endpoint), Download, Try another saree and Delete. #tryonExpired
-    covers session expiry or an explicit deletion.
+    #tryonReady covers the finished preview, Original/Preview comparison, Add
+    to bag (the exact product/variant the job was created for, added through
+    Shopify's own Ajax cart endpoint), Download and Delete. There is no
+    in-dialog way to switch saree: the shopper opens the saree they want and
+    starts from its own button. #tryonExpired covers session expiry or an
+    explicit deletion.
 
   #tryonConfig below is read once by assets/tryon.js; it carries no
   credential, only the non-secret values Liquid already has at render time.
 {%- endcomment -%}
 {%- comment -%}
   .modal--tryon (assets/tryon.css) turns the shared centred modal into a
-  docked panel: a card at the bottom-right on desktop that leaves the product
-  visible beside it, and a bottom sheet on smaller screens. dialog.js is
+  docked panel: the full-height right half of the screen on desktop, leaving
+  the product visible on the left, and a bottom sheet on smaller screens. dialog.js is
   untouched -- focus trap, Escape and focus restore all still come from it.
   Each step leads with one 3:4 photo area (the shopper's photo, then the
   preview) and has exactly one solid primary action.
@@ -96,7 +97,6 @@
             <p class="eyebrow">See yourself in it</p>
             <p class="lead" id="tryonSareeTitle"></p>
           </div>
-          <button type="button" class="tryon-link" id="tryonChangeSaree">Change saree</button>
         </div>
 
         <div class="tryon-panel" id="tryonSignin" hidden>
@@ -211,10 +211,8 @@
             <button type="button" class="btn btn-solid" id="tryonAddToBag" disabled>Add to bag</button>
           </div>
           <div class="tryon-secondary">
-            <button type="button" class="tryon-link" id="tryonTryAnother">Try another saree</button>
             <button type="button" class="tryon-link" id="tryonDownload">Download</button>
             <button type="button" class="tryon-link" id="tryonDelete">Delete</button>
-            <a class="tryon-link tryon-detail-link" id="tryonProductLink" href="#" hidden>Product details</a>
           </div>
         </div>
 

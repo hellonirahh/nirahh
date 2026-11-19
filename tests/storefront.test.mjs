@@ -129,7 +129,6 @@ test('storefront browser regressions', async (t) => {
           <div class="tryon-saree" id="tryonSaree">
             <img class="tryon-saree-image" id="tryonSareeImage" alt="" hidden>
             <div class="tryon-saree-info"><p class="eyebrow">See yourself in it</p><p class="lead" id="tryonSareeTitle"></p></div>
-            <button type="button" class="btn btn-ghost" id="tryonChangeSaree">Change saree</button>
           </div>
           <div class="tryon-panel" id="tryonSignin" hidden>
             <p class="lead">Sign in to your Nirahh account to see this saree on you.</p>
@@ -182,11 +181,9 @@ test('storefront browser regressions', async (t) => {
             <div class="tryon-compare" role="group" aria-label="Compare your photo and the preview">
               <button type="button" class="btn btn-ghost" id="tryonToggleOriginal" aria-pressed="false">Original</button>
               <button type="button" class="btn btn-ghost" id="tryonTogglePreview" aria-pressed="true">Preview</button>
-              <a class="tryon-detail-link" id="tryonProductLink" href="#" hidden>View the real product photos and description</a>
             </div>
             <p class="fineprint" id="tryonBlouseNote">Blouse note</p>
             <div class="tryon-photo-actions">
-              <button type="button" class="btn btn-ghost" id="tryonTryAnother">Try another saree</button>
               <button type="button" class="btn btn-ghost" id="tryonDownload">Download</button>
               <button type="button" class="btn btn-ghost" id="tryonDelete">Delete</button>
               <button type="button" class="btn btn-solid" id="tryonAddToBag" disabled>Add to bag</button>
@@ -900,6 +897,45 @@ test('storefront browser regressions', async (t) => {
     assert.equal(jobCalls[1].body.product_gid, 'gid://shopify/Product/2');
   });
 
+  await t.test('with two photos in the session, the next saree reuses the most recent one', async () => {
+    const page = await newPage();
+    await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'n'.repeat(43)); });
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="gid://shopify/Product/3"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/3" data-tryon-title="Third saree">Try on</button>`);
+    // session/resume lists photos oldest first (api/openapi.json).
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 's1', idle_expires_at: '2026-11-01T01:00:00Z', expires_at: '2026-11-01T03:00:00Z', limits: baseLimits, consent_version: 'v1', feature_enabled: true, photos: [
+        { photo_id: 'first-photo', width: 10, height: 10, expires_at: '2026-11-01T03:00:00Z' },
+        { photo_id: 'second-photo', width: 10, height: 10, expires_at: '2026-11-01T03:00:00Z' }
+      ], jobs: [] } }),
+      'products/eligibility': (body) => ({ data: { items: body.items.map((i) => ({ product_gid: i.product_gid, variant_gid: i.variant_gid, eligible: true, reason: 'approved' })) } }),
+      'session/activity': () => ({ data: {} }),
+      'jobs': () => ({ data: { job_id: 'j3', status: 'queued', deadline_at: '2026-11-01T01:03:00Z', poll_after_ms: 60000, limits: baseLimits } }),
+      'jobs/status': () => ({ data: { job_id: 'j3', status: 'processing', product_gid: 'gid://shopify/Product/3', variant_gid: 'gid://shopify/ProductVariant/3', deadline_at: '2026-11-01T01:03:00Z', stage: 'creating', retry_allowed: false, poll_after_ms: 60000, limits: baseLimits } })
+    });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/dialog.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-api.js') });
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon.js') });
+
+    await page.locator('[data-tryon-open]').click();
+    await page.waitForFunction(() => !document.getElementById('tryonReuse').hidden, null, { timeout: 5000 });
+    await page.locator('#tryonGenerate').click();
+    await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+    assert.equal(calls.find((c) => c.op === 'jobs').body.photo_id, 'second-photo');
+  });
+
+  await t.test('the real dialog offers no Change saree, Try another saree or Product details control', async () => {
+    const markup = fs.readFileSync(path.join(root, 'shopify-theme/snippets/tryon-dialog.liquid'), 'utf8');
+    for (const gone of ['tryonChangeSaree', 'tryonTryAnother', 'tryonProductLink', '>Change saree<', '>Try another saree<', '>Product details<']) {
+      assert.equal(markup.includes(gone), false, `${gone} is still in tryon-dialog.liquid`);
+    }
+    const pdp = fs.readFileSync(path.join(root, 'shopify-theme/sections/main-product.liquid'), 'utf8');
+    assert.match(pdp, /'products\.product\.try_on' \| t/);
+    const locale = JSON.parse(fs.readFileSync(path.join(root, 'shopify-theme/locales/en.default.json'), 'utf8'));
+    assert.equal(locale.products.product.try_on, 'See yourself in it');
+  });
+
   await t.test('a ready result supports Original/Preview comparison, a freshly authorized Download, and Delete ends the session', async () => {
     const page = await newPage();
     await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'd'.repeat(43)); });
@@ -1075,7 +1111,6 @@ test('storefront browser regressions', async (t) => {
     await page.locator('#tryonGenerate').click();
     await page.waitForFunction(() => !document.getElementById('tryonReady').hidden, null, { timeout: 5000 });
     assert.equal(await page.locator('#tryonAddToBag').isDisabled(), false);
-    assert.equal(await page.locator('#tryonProductLink').getAttribute('href'), '/products/rani-saree');
 
     // Comparing Original/Preview must not change which variant a later Add
     // to bag targets.

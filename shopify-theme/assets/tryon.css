@@ -70,21 +70,28 @@
   display: none;
 }
 
+/* Desktop: the full-height right half of the screen, so the photo and the
+   preview are large enough to judge without zooming, and the product page
+   stays visible on the left. Capped so a very wide monitor does not stretch
+   the buttons edge to edge. */
 .modal--tryon {
-  place-items: end;
-  padding: 1.25rem;
+  place-items: stretch end;
+  padding: 0;
   background: rgba(20, 17, 14, .16);
 }
 .modal--tryon .modal-panel {
+  --tryon-gutter: 2rem;
   display: flex;
   flex-direction: column;
-  width: min(420px, 100%);
-  max-height: calc(100svh - 2.5rem);
+  width: min(100%, max(480px, 50vw), 960px);
+  height: 100svh;
+  max-height: 100svh;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: 0 24px 60px rgba(35, 32, 28, .24);
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 14px 0 0 14px;
+  box-shadow: -24px 0 60px rgba(35, 32, 28, .2);
   animation: tryon-dock-in .28s ease-out;
 }
 .modal--tryon .modal-body {
@@ -92,7 +99,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 1.25rem 1.25rem;
+  padding: 0 var(--tryon-gutter) var(--tryon-gutter);
 }
 .modal--tryon .modal-close {
   top: .45rem;
@@ -108,7 +115,7 @@
 }
 
 @keyframes tryon-dock-in {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateX(32px); }
   to { opacity: 1; transform: none; }
 }
 
@@ -116,13 +123,16 @@
 @media (max-width: 989px) {
   .modal--tryon {
     place-items: end center;
-    padding: 0;
   }
   .modal--tryon .modal-panel {
+    --tryon-gutter: 1.25rem;
     width: min(560px, 100%);
-    max-height: 92svh;
-    border-width: 1px 0 0;
+    height: auto;
+    max-height: 96svh;
+    border-left: 0;
+    border-top: 1px solid var(--line);
     border-radius: 16px 16px 0 0;
+    box-shadow: 0 -16px 48px rgba(35, 32, 28, .2);
     animation-name: tryon-sheet-in;
   }
   .modal--tryon .modal-panel::before {
@@ -149,7 +159,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  margin: 0 -1.25rem;
+  margin: 0 calc(-1 * var(--tryon-gutter));
   padding: 1rem 3rem .85rem;
   background: var(--ivory);
   border-bottom: 1px solid var(--line);
@@ -201,10 +211,6 @@
   flex: none;
   background: var(--paper);
 }
-.tryon-saree .tryon-link {
-  flex: none;
-  white-space: nowrap;
-}
 .tryon-saree-info {
   flex: 1 1 auto;
   min-width: 0;
@@ -230,7 +236,7 @@
   place-items: center;
   width: 100%;
   aspect-ratio: 3 / 4;
-  max-height: min(54svh, 500px);
+  max-height: 58svh;
   margin-bottom: .85rem;
   overflow: hidden;
   border-radius: 10px;
@@ -332,6 +338,38 @@
 #tryonPhoto:not([data-has-photo]) .tryon-hero {
   aspect-ratio: 5 / 4;
   max-height: min(34svh, 300px);
+}
+
+/* Desktop: the shopper's photo and the preview take every pixel of panel
+   height left over after the header, saree row and actions, so the primary
+   action stays in view at any window height. The body only scrolls once
+   the photo would drop below 280px. */
+@media (min-width: 990px) {
+  .modal--tryon .modal-body {
+    display: flex;
+    flex-direction: column;
+  }
+  /* Only the photo-led states grow. :not([hidden]) keeps these ID rules
+     from overriding the #tryOnModal [hidden] rule above. */
+  #tryonPhoto[data-has-photo]:not([hidden]),
+  #tryonPhoto[data-has-photo] #tryonUploadFields:not([hidden]),
+  #tryonCreate:not([hidden]),
+  #tryonReady:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+  }
+  #tryonPhoto[data-has-photo] .tryon-hero,
+  .tryon-hero--working,
+  .tryon-hero--result {
+    flex: 1 1 0;
+    aspect-ratio: auto;
+    min-height: 280px;
+    max-height: none;
+  }
+  #tryonPhoto:not([data-has-photo]) .tryon-hero {
+    max-height: min(40svh, 420px);
+  }
 }
 #tryonPhoto[data-has-photo] .tryon-drop,
 #tryonPhoto[data-has-photo] .tryon-guidance {
