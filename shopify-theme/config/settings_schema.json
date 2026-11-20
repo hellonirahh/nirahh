@@ -139,5 +139,27 @@
         "label": "Support phone"
       }
     ]
+  },
+  {
+    "name": "Virtual try-on",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Controls the real try-on entry points, not just the homepage teaser. Leave disabled until the backend session, consent and generation flow are verified end to end; every entry point keeps showing the existing \"still in the works\" message while this is off."
+      },
+      {
+        "type": "checkbox",
+        "id": "tryon_enabled",
+        "label": "Enable virtual try-on",
+        "default": false
+      },
+      {
+        "type": "text",
+        "id": "tryon_proxy_path",
+        "label": "App proxy path",
+        "info": "The Shopify app proxy subpath that forwards to the try-on backend, for example /apps/nirahh-tryon. Unused while disabled above.",
+        "default": "/apps/nirahh-tryon"
+      }
+    ]
   }
 ]
