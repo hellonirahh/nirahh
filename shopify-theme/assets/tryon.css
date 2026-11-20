@@ -1,7 +1,10 @@
-/* Virtual try-on entry points (steps 24-27). Locally scoped: the shared
-   dialog itself reuses .modal/.modal-panel/.modal-close/.modal-actions and
-   the .btn/.eyebrow/.display/.lead/.fineprint type styles already defined in
-   style.css, so only the one new entry point below needs a rule here. */
+/* Virtual try-on. The shared dialog reuses .modal/.modal-panel/.modal-close
+   and the .btn/.eyebrow/.lead/.fineprint type styles from style.css; this
+   file only adds the entry points and the docked fitting-room panel. */
+
+/* ---------- Entry points ---------- */
+
+/* Product card: a quiet text link under the card. */
 .product-try {
   margin-top: .5rem;
   display: inline-flex;
@@ -20,180 +23,655 @@
   color: var(--ink);
 }
 
-/* Fitting-room dialog panels (step 25): session, consent and upload. */
+/* Product page: full width, first in the actions row, in sand so it sits
+   apart from the solid purchase button without competing with it. */
+.pdp-actions .pdp-try {
+  order: -1;
+  flex: 1 1 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .65rem;
+  background: var(--sand);
+  border-color: var(--sand);
+  color: var(--ink);
+  cursor: pointer;
+}
+.pdp-actions .pdp-try:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ivory);
+}
+.pdp-try-icon {
+  position: relative;
+  width: 1.5rem;
+  height: .85rem;
+  flex: none;
+}
+/* Two overlapping rings: you, and you in the saree. */
+.pdp-try-icon::before,
+.pdp-try-icon::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: .85rem;
+  height: .85rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+.pdp-try-icon::before { left: 0; }
+.pdp-try-icon::after { right: 0; background: currentColor; opacity: .35; }
+
+/* ---------- Docked panel ---------- */
+
+/* style.css's .btn sets display:inline-block, which beats the hidden
+   attribute; keep hidden meaning hidden everywhere inside the dialog. */
+#tryOnModal [hidden] {
+  display: none;
+}
+
+/* Desktop: the full-height right half of the screen, so the photo and the
+   preview are large enough to judge without zooming, and the product page
+   stays visible on the left. Capped so a very wide monitor does not stretch
+   the buttons edge to edge. */
+.modal--tryon {
+  place-items: stretch end;
+  padding: 0;
+  background: rgba(20, 17, 14, .16);
+}
+.modal--tryon .modal-panel {
+  --tryon-gutter: 2rem;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, max(480px, 50vw), 960px);
+  height: 100svh;
+  max-height: 100svh;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 14px 0 0 14px;
+  box-shadow: -24px 0 60px rgba(35, 32, 28, .2);
+  animation: tryon-dock-in .28s ease-out;
+}
+.modal--tryon .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--tryon-gutter) var(--tryon-gutter);
+}
+.modal--tryon .modal-close {
+  top: .45rem;
+  right: .6rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+/* The "still in the works" branch has no header bar. */
+.modal--tryon .modal-body > .eyebrow:first-child {
+  margin-top: 1.75rem;
+}
+
+@keyframes tryon-dock-in {
+  from { opacity: 0; transform: translateX(32px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Below desktop width: a bottom sheet. */
+@media (max-width: 989px) {
+  .modal--tryon {
+    place-items: end center;
+  }
+  .modal--tryon .modal-panel {
+    --tryon-gutter: 1.25rem;
+    width: min(560px, 100%);
+    height: auto;
+    max-height: 96svh;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -16px 48px rgba(35, 32, 28, .2);
+    animation-name: tryon-sheet-in;
+  }
+  .modal--tryon .modal-panel::before {
+    content: "";
+    position: absolute;
+    top: .4rem;
+    left: 50%;
+    width: 2.5rem;
+    height: 4px;
+    margin-left: -1.25rem;
+    border-radius: 999px;
+    background: var(--line);
+    z-index: 3;
+  }
+}
+
+@keyframes tryon-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+/* Header bar: stays put while the body scrolls. */
+.tryon-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 calc(-1 * var(--tryon-gutter));
+  padding: 1rem 3rem .85rem;
+  background: var(--ivory);
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+.tryon-head-title {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: .68rem;
+  font-weight: 500;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* Quiet text actions: everything that is not the one primary button. */
+.tryon-link {
+  background: none;
+  border: 0;
+  padding: .3rem 0;
+  font-family: var(--sans);
+  font-size: .72rem;
+  letter-spacing: .06em;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.tryon-link:hover {
+  color: var(--ink);
+}
+.tryon-link:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
+/* The saree being tried on. */
 .tryon-saree {
   display: flex;
   align-items: center;
   gap: .75rem;
-  margin: .75rem 0 1rem;
+  margin: .9rem 0;
 }
 .tryon-saree-image {
-  width: 56px;
+  width: 44px;
   height: 56px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 6px;
   flex: none;
+  background: var(--paper);
 }
 .tryon-saree-info {
   flex: 1 1 auto;
   min-width: 0;
 }
 .tryon-saree-info .eyebrow {
-  margin: 0 0 .15rem;
+  margin: 0 0 .1rem;
+  font-size: .56rem;
 }
 .tryon-saree-info .lead {
   margin: 0;
+  font-size: 1.05rem;
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tryon-guidance {
-  margin: 0 0 1rem;
-  padding-left: 1.1rem;
-}
-.tryon-guidance li {
-  margin-bottom: .25rem;
-}
+/* ---------- The photo area ---------- */
 
-.tryon-preview {
-  display: block;
+.tryon-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
   width: 100%;
-  max-height: 320px;
+  aspect-ratio: 3 / 4;
+  max-height: 58svh;
+  margin-bottom: .85rem;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--paper);
+}
+/* Never stretch a person: contain, on a neutral ground. */
+.tryon-preview,
+.tryon-hero-img {
+  display: block;
   object-fit: contain;
-  border-radius: 4px;
-  margin-bottom: .5rem;
   background: var(--sand);
 }
+.tryon-hero-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
 
-.tryon-file-label {
-  display: block;
-  font-size: .62rem;
+.tryon-hero--intro {
+  aspect-ratio: 16 / 10;
+  background: radial-gradient(circle at 50% 42%, var(--logo-paper), var(--paper) 72%);
+}
+.tryon-hero-mark {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  border: 1px solid var(--gold);
+  box-shadow: inset 0 0 0 .55rem var(--logo-paper), inset 0 0 0 calc(.55rem + 1px) var(--gold);
+}
+
+/* Empty state: the hero is the upload target. */
+.tryon-drop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  margin: 0;
+  padding: 1.5rem;
+  border: 1px dashed var(--gold);
+  border-radius: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: background .25s ease;
+}
+.tryon-drop:hover {
+  background: var(--sand);
+}
+.tryon-drop-icon {
+  position: relative;
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-bottom: .35rem;
+  border-radius: 50%;
+  border: 1px solid var(--gold);
+}
+.tryon-drop-icon::before,
+.tryon-drop-icon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.1rem;
+  height: 1px;
+  margin: 0 0 0 -.55rem;
+  background: var(--gold-deep);
+}
+.tryon-drop-icon::after {
+  transform: rotate(90deg);
+}
+.tryon-drop-title {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  color: var(--ink);
+}
+.tryon-drop-sub {
+  font-size: .7rem;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+/* The real file input stays focusable; show its focus on the target. */
+.tryon-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.tryon-hero:has(.tryon-file-input:focus-visible) .tryon-drop {
+  outline: 2px solid var(--ink);
+  outline-offset: -5px;
+}
+/* Before a photo is chosen the target does not need portrait height; a
+   shorter one keeps the guidance, consent and button in view. */
+#tryonPhoto:not([data-has-photo]) .tryon-hero {
+  aspect-ratio: 5 / 4;
+  max-height: min(34svh, 300px);
+}
+
+/* Desktop: the shopper's photo and the preview take every pixel of panel
+   height left over after the header, saree row and actions, so the primary
+   action stays in view at any window height. The body only scrolls once
+   the photo would drop below 280px. */
+@media (min-width: 990px) {
+  .modal--tryon .modal-body {
+    display: flex;
+    flex-direction: column;
+  }
+  /* Only the photo-led states grow. :not([hidden]) keeps these ID rules
+     from overriding the #tryOnModal [hidden] rule above. */
+  #tryonPhoto[data-has-photo]:not([hidden]),
+  #tryonPhoto[data-has-photo] #tryonUploadFields:not([hidden]),
+  #tryonCreate:not([hidden]),
+  #tryonReady:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+  }
+  #tryonPhoto[data-has-photo] .tryon-hero,
+  .tryon-hero--working,
+  .tryon-hero--result {
+    flex: 1 1 0;
+    aspect-ratio: auto;
+    min-height: 280px;
+    max-height: none;
+  }
+  #tryonPhoto:not([data-has-photo]) .tryon-hero {
+    max-height: min(40svh, 420px);
+  }
+}
+#tryonPhoto[data-has-photo] .tryon-drop,
+#tryonPhoto[data-has-photo] .tryon-guidance {
+  display: none;
+}
+
+/* Chips over the photo. */
+.tryon-chips {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: .8rem;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: .4rem;
+  padding: 0 .8rem;
+  pointer-events: none;
+}
+.tryon-chip {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem .95rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(35, 32, 28, .74);
+  color: var(--ivory);
+  font-family: var(--sans);
+  font-size: .72rem;
+  letter-spacing: .04em;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+button.tryon-chip:hover {
+  background: var(--ink);
+}
+button.tryon-chip:disabled {
+  opacity: .55;
+  cursor: default;
+}
+.tryon-chip--quiet {
+  cursor: default;
+  background: rgba(251, 248, 243, .9);
+  color: var(--ink);
+}
+
+/* Status laid over the photo: upload progress, or the running stage. */
+.tryon-hero-status {
+  position: absolute;
+  left: .8rem;
+  right: .8rem;
+  bottom: .8rem;
+  z-index: 2;
+  display: grid;
+  gap: .2rem;
+  justify-items: center;
+  text-align: center;
+}
+#tryonPhotoHero .tryon-hero-status {
+  top: .8rem;
+  bottom: auto;
+}
+.tryon-hero-status:has(p:not(:empty):not([hidden]), progress:not([hidden])) {
+  padding: .65rem .9rem;
+  border-radius: 10px;
+  background: rgba(251, 248, 243, .92);
+  box-shadow: 0 6px 18px rgba(35, 32, 28, .12);
+}
+.tryon-hero-status > * {
+  margin: 0;
+}
+.tryon-hero-stage {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  color: var(--ink);
+}
+.tryon-elapsed {
+  font-size: .7rem;
+  color: var(--muted);
+}
+.tryon-progress {
+  width: 100%;
+  accent-color: var(--ink);
+}
+
+/* Generating: a soft shimmer across the shopper's photo. */
+.tryon-shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(110deg, transparent 30%, rgba(251, 248, 243, .5) 50%, transparent 70%),
+    rgba(251, 248, 243, .18);
+  background-size: 250% 100%, auto;
+  animation: tryon-shimmer 1.9s linear infinite;
+}
+#tryonCreate[data-working="false"] .tryon-shimmer {
+  display: none;
+}
+@keyframes tryon-shimmer {
+  from { background-position: 120% 0, 0 0; }
+  to { background-position: -120% 0, 0 0; }
+}
+
+/* Ready: the comparison toggle sits at the top of the result. */
+.tryon-hero--result .tryon-chips {
+  top: .8rem;
+  bottom: auto;
+}
+.tryon-segment {
+  pointer-events: auto;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(251, 248, 243, .9);
+  box-shadow: 0 4px 14px rgba(35, 32, 28, .14);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.tryon-segment-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: .38rem .95rem;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: .64rem;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: .35rem;
+  cursor: pointer;
+}
+.tryon-segment-btn[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--ivory);
+}
+
+/* ---------- Text, consent and actions ---------- */
+
+.tryon-guidance {
+  list-style: none;
+  margin: 0 0 .75rem;
+  padding: 0;
+  display: grid;
+  gap: .3rem;
+}
+.tryon-guidance li {
+  position: relative;
+  padding-left: 1rem;
+}
+.tryon-guidance li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: .62em;
+  width: .35rem;
+  height: .35rem;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.tryon-preview-caption {
+  margin: 0 0 .5rem;
+  text-align: center;
 }
 
 .tryon-consent {
   display: flex;
   align-items: flex-start;
-  gap: .5rem;
-  font-size: .85rem;
-  line-height: 1.4;
+  gap: .55rem;
+  margin: .5rem 0 0;
+  font-size: .78rem;
+  line-height: 1.45;
   color: var(--muted);
-  margin: .75rem 0;
+  cursor: pointer;
 }
 .tryon-consent input {
   margin-top: .2rem;
   flex: none;
+  accent-color: var(--ink);
 }
 
-.tryon-progress {
-  width: 100%;
-  margin: .5rem 0;
-}
-
-.tryon-photo-actions {
+.tryon-reuse {
   display: flex;
-  gap: .5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .85rem 1rem;
+  border-radius: 10px;
+  background: var(--paper);
+}
+.tryon-reuse .lead {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* Exactly one solid action per step, full width. */
+.tryon-primary {
+  margin-top: 1rem;
+}
+.tryon-primary:not(:has(> :not([hidden]))) {
+  display: none;
+}
+.tryon-primary .btn {
+  display: block;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  text-align: center;
+  cursor: pointer;
+}
+.tryon-primary .btn-solid:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+.tryon-primary .btn-solid:disabled:hover {
+  background: var(--ink);
+  color: var(--ivory);
+}
+
+.tryon-secondary {
+  display: flex;
   flex-wrap: wrap;
+  justify-content: center;
+  gap: .25rem 1.4rem;
+  margin-top: .7rem;
+}
+
+.tryon-panel > .lead:first-child {
+  margin-top: .25rem;
+}
+.tryon-panel .fineprint {
   margin-top: .5rem;
 }
 
-/* .btn { display: inline-block } in style.css overrides the hidden attribute,
-   so Try again stayed on screen during "Waiting to start…". */
-#tryOnModal [hidden] {
-  display: none;
+.tryon-counters {
+  margin-top: .85rem;
+  text-align: center;
+}
+/* While the chip over the photo shows the count, keep the full line for
+   screen readers only rather than saying it twice on screen. */
+.modal--tryon:has(#tryonPhoto:not([hidden]) #tryonUploadFields:not([hidden]) #tryonCounterChip:not([hidden])) .tryon-counters {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .tryon-notice {
+  margin-top: .85rem;
+  padding: .7rem .9rem;
+  border-left: 2px solid var(--gold);
+  background: var(--paper);
   color: var(--ink);
 }
 
-/* Reusing an already-validated photo for a second saree (step 26): skips
-   the file input/consent entirely rather than hiding it visually only. */
-.tryon-reuse {
-  margin-bottom: 1rem;
-}
-.tryon-reuse .lead {
-  margin: 0 0 .5rem;
-}
+/* ---------- Progress steps ---------- */
 
-/* Create (queued/creating/checking) and Ready panels (step 26). */
-.tryon-result {
-  background: var(--sand);
-}
-.tryon-compare {
-  display: flex;
-  gap: .5rem;
-  margin: .5rem 0;
-}
-.tryon-compare .btn[aria-pressed="true"] {
-  color: var(--ink);
-  border-color: currentColor;
-}
-.tryon-detail-link {
-  align-self: center;
-  margin-left: auto;
-  font-size: .72rem;
-  letter-spacing: .04em;
-  color: var(--muted);
-  text-decoration: underline;
-}
-.tryon-detail-link:hover {
-  color: var(--ink);
-}
-
-/* Generation takes tens of seconds and the model reports no percentage,
-   so the dialog shows which stage is running plus an indeterminate bar
-   rather than a number it would have to invent. */
 .tryon-steps {
   list-style: none;
-  margin: .75rem 0 .5rem;
+  margin: 0 0 .5rem;
   padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: .25rem 1.25rem;
+  justify-content: space-between;
+  gap: .5rem;
 }
-
 .tryon-step {
   position: relative;
-  padding-left: 1.1rem;
-  font-size: .8rem;
+  padding-left: 1rem;
+  font-size: .72rem;
   line-height: 1.6;
   opacity: .45;
 }
-
 .tryon-step::before {
   content: "";
   position: absolute;
   left: 0;
   top: .5em;
-  width: .5rem;
-  height: .5rem;
+  width: .45rem;
+  height: .45rem;
   border-radius: 50%;
   border: 1px solid currentColor;
 }
-
 .tryon-step[data-state="done"] {
   opacity: .7;
 }
-
 .tryon-step[data-state="done"]::before {
   background: currentColor;
 }
-
 .tryon-step[data-state="active"] {
   opacity: 1;
-  font-weight: 600;
+  font-weight: 500;
 }
-
 .tryon-step[data-state="active"]::before {
   background: currentColor;
   animation: tryon-pulse 1.4s ease-in-out infinite;
 }
-
 @keyframes tryon-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.45); opacity: .45; }
@@ -201,36 +679,30 @@
 
 .tryon-bar {
   position: relative;
-  height: 3px;
+  height: 2px;
   width: 100%;
   overflow: hidden;
   border-radius: 999px;
-  background: currentColor;
-  opacity: .14;
-  margin: .25rem 0 .5rem;
+  background: var(--line);
 }
-
 .tryon-bar > span {
   position: absolute;
   inset: 0 auto 0 0;
   width: 38%;
   border-radius: inherit;
-  background: currentColor;
+  background: var(--ink);
   animation: tryon-slide 1.5s ease-in-out infinite;
 }
-
 @keyframes tryon-slide {
   0% { left: -40%; }
   100% { left: 100%; }
 }
 
-.tryon-elapsed {
-  opacity: .6;
-}
-
-/* PRD 3.4: respect a reduced-motion preference. The indicator stays
+/* PRD 3.4: respect a reduced-motion preference. Every indicator stays
    visible and the stage text still updates; only the motion stops. */
 @media (prefers-reduced-motion: reduce) {
+  .modal--tryon .modal-panel { animation: none; }
   .tryon-step[data-state="active"]::before { animation: none; }
   .tryon-bar > span { animation: none; left: 0; width: 100%; opacity: .5; }
+  .tryon-shimmer { animation: none; background: rgba(251, 248, 243, .3); }
 }
