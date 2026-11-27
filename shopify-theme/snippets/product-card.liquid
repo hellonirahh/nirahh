@@ -33,5 +33,20 @@
       {{ card_product.price | money }}
       {%- unless card_product.available %} &middot; {{ 'products.product.sold_out' | t }}{% endunless -%}
     </p>
+    {%- comment -%}
+      Outside both links above, so clicking it never navigates the card.
+      Hidden while settings.tryon_enabled is off, matching every other entry
+      point's default-disabled state (steps 24-27).
+    {%- endcomment -%}
+    {%- if settings.tryon_enabled -%}
+      <button type="button" class="product-try" data-tryon-open
+              data-tryon-product-gid="gid://shopify/Product/{{ card_product.id }}"
+              data-tryon-variant-gid="gid://shopify/ProductVariant/{{ card_product.selected_or_first_available_variant.id }}"
+              data-tryon-title="{{ card_product.title | escape }}"
+              data-tryon-url="{{ card_product.url }}"
+              {%- if card_product.featured_image %} data-tryon-image="{{ card_product.featured_image | image_url: width: 200 }}"{% endif %}>
+        {{ 'products.product.try_on' | t }}
+      </button>
+    {%- endif -%}
   {%- endif -%}
 </article>
