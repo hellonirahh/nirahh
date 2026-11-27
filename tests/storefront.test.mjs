@@ -120,6 +120,10 @@ test('storefront browser regressions', async (t) => {
   // Shopify Liquid renderer available in CI.
   function tryonDialogFixture(signedIn, previewThemeId) {
     const config = JSON.stringify({ proxyPath: '/apps/nirahh-tryon', signedIn, loginUrl: '/account/login', previewThemeId: previewThemeId || '', locale: 'en', cartRoot: '/', cartUrl: '/cart' });
+    // Ready is plain HTML in the Liquid snippet, so exercise the actual
+    // controls, focus order and allowance confirmation in the browser.
+    const snippet = fs.readFileSync(path.join(root, 'shopify-theme/snippets/tryon-dialog.liquid'), 'utf8');
+    const readyPanel = snippet.slice(snippet.indexOf('<div class="tryon-panel" id="tryonReady"'), snippet.indexOf('<div class="tryon-panel" id="tryonExpired"'));
     return `
       <div class="modal" id="tryOnModal" hidden><div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tryOnTitle">
         <button class="modal-close" id="modalClose" aria-label="Close" type="button">&times;</button>
@@ -175,20 +179,7 @@ test('storefront browser regressions', async (t) => {
               <button type="button" class="btn btn-solid" id="tryonTryAgain" hidden>Try again</button>
             </div>
           </div>
-          <div class="tryon-panel" id="tryonReady" hidden>
-            <p class="lead">Here's your AI styling preview.</p>
-            <img class="tryon-preview tryon-result" id="tryonResultImg" alt="">
-            <div class="tryon-compare" role="group" aria-label="Compare your photo and the preview">
-              <button type="button" class="btn btn-ghost" id="tryonToggleOriginal" aria-pressed="false">Original</button>
-              <button type="button" class="btn btn-ghost" id="tryonTogglePreview" aria-pressed="true">Preview</button>
-            </div>
-            <p class="fineprint" id="tryonBlouseNote">Blouse note</p>
-            <div class="tryon-photo-actions">
-              <button type="button" class="btn btn-ghost" id="tryonDownload">Download</button>
-              <button type="button" class="btn btn-ghost" id="tryonDelete">Delete</button>
-              <button type="button" class="btn btn-solid" id="tryonAddToBag" disabled>Add to bag</button>
-            </div>
-          </div>
+          ${readyPanel}
           <div class="tryon-panel" id="tryonExpired" hidden>
             <p class="lead">This session has ended.</p>
             <button type="button" class="btn btn-solid" id="tryonStartNew">Start a new session</button>
@@ -858,6 +849,128 @@ test('storefront browser regressions', async (t) => {
     await page.waitForFunction(() => !document.getElementById('tryonReady').hidden, null, { timeout: 5000 });
     assert.equal(calls.filter((c) => c.op === 'jobs').length, 1);
     assert.equal(await page.locator('#tryonResultImg').getAttribute('src'), 'http://nirahh.test/result.jpg');
+  });
+
+  // Model only the server state needed by the repeat flow. Returning it on
+  // each resume also exercises navigation away from and back to the saree.
+  async function blouseFixture({ jobs, photos, limits, create, status }) {
+    const page = await newPage();
+    const product = { product_gid: 'gid://shopify/Product/1', variant_gid: 'gid://shopify/ProductVariant/42' };
+    await page.addInitScript(() => sessionStorage.setItem('nirahh_tryon_session_token', 's'.repeat(43)));
+    await gotoFixture(page, `${tryonDialogFixture(true)}
+      <button data-tryon-open data-tryon-product-gid="${product.product_gid}" data-tryon-variant-gid="${product.variant_gid}">Try on</button>`);
+    const calls = await mockProxy(page, {
+      'session/resume': () => ({ data: { session_id: 'session', limits: limits(), feature_enabled: true,
+        photos: photos.map(photo_id => ({ photo_id })), jobs: jobs.map(job => ({ ...product, ...job })) } }),
+      'session/activity': () => ({ data: {} }),
+      'products/eligibility': () => ({ data: { items: [{ ...product, eligible: true }] } }),
+      'jobs': create,
+      'jobs/status': ({ job_id }) => ({ data: { ...product, job_id, status: 'ready', stage: 'complete',
+        limits: limits(), retry_allowed: limits().effective_remaining_generations > 0,
+        original: { photo_id: photos[0], url: 'http://nirahh.test/original.jpg' },
+        result: { result_url: 'http://nirahh.test/' + job_id + '.jpg' }, ...status(job_id) } })
+    });
+    for (const script of ['dialog', 'tryon-api', 'tryon']) {
+      await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/' + script + '.js') });
+    }
+    const open = () => page.locator('[data-tryon-open]').click();
+    const reopen = async () => { await page.locator('#modalClose').click(); await open(); };
+    await open();
+    return { page, calls, reopen, product };
+  }
+
+  await t.test('a confirmed same-saree repeat uses the original photo and one new job, including after reopening', async () => {
+    const jobs = [];
+    const photos = ['first-photo'];
+    const limits = () => ({ ...baseLimits, remaining_generations: 2 - jobs.length, effective_remaining_generations: 2 - jobs.length });
+    const { page, calls, reopen, product } = await blouseFixture({ jobs, photos, limits, status: () => ({}),
+      create: () => {
+        const job_id = jobs.length ? '20000000-0000-4000-8000-000000000002' : '20000000-0000-4000-8000-000000000001';
+        jobs.push({ job_id, status: 'ready' });
+        return { data: { job_id, status: 'queued', limits: limits() } };
+      }
+    });
+    const another = page.locator('#tryonAnotherBlouse');
+    await page.locator('#tryonReuse').waitFor();
+    await page.locator('#tryonGenerate').click();
+    await another.click();
+    assert.match(await page.locator('#tryonBlouseNote').textContent(), /styling suggestion/);
+    assert.match(await page.locator('#tryonBlouseCost').textContent(), /one more preview from this session/);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'tryonKeepPreview');
+    await page.locator('#tryonKeepPreview').click();
+    assert.equal(await page.locator('#tryonBlouseConfirm').isHidden(), true);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'tryonAnotherBlouse');
+
+    photos.push('newer-unrelated-photo');
+    await another.click();
+    await reopen();
+    await another.waitFor();
+    assert.equal(await page.locator('#tryonBlouseConfirm').isHidden(), true);
+    assert.equal(calls.filter(c => c.op === 'jobs').length, 1);
+    await another.click();
+    await page.locator('#tryonConfirmBlouse').evaluate(button => { button.click(); button.click(); });
+    const finalImage = page.locator('#tryonResultImg[src$="000002.jpg"]');
+    await finalImage.waitFor();
+    assert.equal(await another.isHidden(), true);
+    assert.equal(await page.locator('#tryonAddToBag').isEnabled(), true);
+    await reopen();
+    await finalImage.waitFor();
+    const creates = calls.filter(c => c.op === 'jobs').map(c => c.body);
+    assert.equal(creates.length, 2);
+    assert.notEqual(creates[0].idempotency_key, creates[1].idempotency_key);
+    assert.deepEqual(creates[1], { ...product, session_token: 's'.repeat(43), photo_id: 'first-photo', idempotency_key: jobs[0].job_id });
+    assert.equal(calls.some(c => c.op.startsWith('uploads/')), false);
+  });
+
+  await t.test('an unlimited account can retry after a failed design, and a lost response replays the same confirmation', async () => {
+    const jobs = [{ job_id: '10000000-0000-4000-8000-000000000001', status: 'ready' },
+      { job_id: '10000000-0000-4000-8000-000000000002', status: 'quality_rejected' }];
+    const limits = () => ({ ...baseLimits, exempt_from_limits: true });
+    let unavailable = true;
+    let accepted = false;
+    const { page, calls, reopen } = await blouseFixture({ jobs, photos: ['first'], limits,
+      status: () => unavailable ? { original: { url: 'http://nirahh.test/legacy.jpg' } } : {},
+      create: () => {
+        if (!accepted) {
+          accepted = true;
+          return { status: 503, error: { code: 'SERVICE_UNAVAILABLE', message: 'Unable to confirm the request.', retryable: true } };
+        }
+        return { data: { job_id: '10000000-0000-4000-8000-000000000003', limits: limits() } };
+      }
+    });
+    await page.locator('#tryonReady').waitFor();
+    assert.equal(await page.locator('#tryonAnotherBlouse').isHidden(), true);
+    unavailable = false;
+    await reopen();
+    await page.locator('#tryonAnotherBlouse').click();
+    assert.match(await page.locator('#tryonBlouseCost').textContent(), /unlimited previews/);
+    await page.locator('#tryonConfirmBlouse').click();
+    await page.locator('#tryonNotice').filter({ hasText: 'Unable to confirm the request.' }).waitFor();
+    await page.locator('#tryonAnotherBlouse').click();
+    await page.locator('#tryonConfirmBlouse').click();
+    await page.locator('#tryonResultImg[src$="000003.jpg"]').waitFor();
+    const keys = calls.filter(c => c.op === 'jobs').map(c => c.body.idempotency_key);
+    assert.deepEqual(keys, [jobs[1].job_id, jobs[1].job_id]);
+  });
+
+  await t.test('reopening follows the active repeat, explains a rejected last attempt and keeps the earlier result available', async () => {
+    const jobs = [{ job_id: 'first', status: 'ready' }, { job_id: 'second', status: 'processing' }];
+    const limits = () => ({ ...baseLimits, remaining_generations: 0, effective_remaining_generations: 0 });
+    const { page, calls, reopen } = await blouseFixture({ jobs, photos: ['photo'], limits,
+      status: (id) => {
+        if (id === 'first') return {};
+        jobs[1].status = 'quality_rejected';
+        return { status: 'quality_rejected', stage: 'stopped', error_code: 'QUALITY_REJECTED', result: undefined };
+      }
+    });
+    await page.locator('#tryonNotice').filter({ hasText: "couldn't create a faithful preview" }).waitFor();
+    assert.equal(await page.locator('#tryonReady').isHidden(), true);
+    assert.equal(await page.locator('#tryonTryAgain').isHidden(), true);
+    await reopen();
+    await page.locator('#tryonResultImg[src$="first.jpg"]').waitFor();
+    assert.equal(await page.locator('#tryonAnotherBlouse').isHidden(), true);
+    assert.deepEqual(calls.filter(c => c.op === 'jobs/status').map(c => c.body.job_id), ['second', 'first']);
+    assert.equal(calls.some(c => c.op === 'jobs'), false);
   });
 
   await t.test('dismissing the dialog keeps the job recoverable without re-uploading or re-creating it', async () => {

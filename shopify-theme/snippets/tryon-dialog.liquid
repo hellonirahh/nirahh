@@ -206,7 +206,15 @@
               </div>
             </div>
           </div>
-          <p class="fineprint" id="tryonBlouseNote">An AI styling preview. Blouse styling shown is a suggestion; it's included only if the product description says so.</p>
+          <p class="fineprint" id="tryonBlouseNote">The blouse design is a styling suggestion. Check the product description to see what’s included.</p>
+          <button type="button" class="tryon-link" id="tryonAnotherBlouse" aria-expanded="false" aria-controls="tryonBlouseConfirm" hidden>Try a different blouse on this saree</button>
+          <div class="tryon-blouse-confirm" id="tryonBlouseConfirm" role="group" aria-labelledby="tryonBlouseCost" hidden>
+            <p class="fineprint" id="tryonBlouseCost"></p>
+            <div class="tryon-secondary">
+              <button type="button" class="tryon-link" id="tryonKeepPreview" aria-describedby="tryonBlouseCost">Keep this preview</button>
+              <button type="button" class="btn btn-ghost" id="tryonConfirmBlouse">Generate another preview</button>
+            </div>
+          </div>
           <div class="tryon-primary">
             <button type="button" class="btn btn-solid" id="tryonAddToBag" disabled>Add to bag</button>
           </div>
