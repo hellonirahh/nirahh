@@ -607,6 +607,17 @@ button.tryon-chip:disabled {
   margin-top: .5rem;
 }
 
+.tryon-blouse-confirm {
+  margin-top: .5rem;
+  padding: .75rem 1rem;
+  background: var(--paper);
+  border-radius: 10px;
+}
+.tryon-blouse-confirm .tryon-secondary {
+  align-items: center;
+  justify-content: flex-start;
+}
+
 .tryon-counters {
   margin-top: .85rem;
   text-align: center;

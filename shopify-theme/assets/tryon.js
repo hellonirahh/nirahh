@@ -23,7 +23,7 @@
 
   var JOB_FAILURE_MESSAGES = {
     GENERATION_FAILED: "We couldn't create your preview. Try again.",
-    QUALITY_REJECTED: "That combination didn't meet our quality bar. Try a different photo or saree.",
+    QUALITY_REJECTED: "We couldn't create a faithful preview of your photo and saree.",
     OUTCOME_UNKNOWN: "We couldn't confirm what happened with that preview."
   };
 
@@ -156,14 +156,8 @@
     var pendingJobs = {};
     var currentJobId = null;
     var jobPollToken = 0;
-    var latestOriginal = null;
-    var latestResult = null;
-
-    // The exact product/variant the ready job was created for, read from
-    // the job's own server response rather than whatever the underlying
-    // page's variant selector shows now (3.6/16: "changing the product
-    // selector does not relabel an old result").
-    var readyVariantGid = null;
+    // The status of the displayed result owns its original photo and variant.
+    var readyJob = null;
 
     function readConfig() {
       var node = document.getElementById('tryonConfig');
@@ -203,6 +197,11 @@
         continueShopping: document.getElementById('tryonContinueShopping'),
         tryAgain: document.getElementById('tryonTryAgain'),
         ready: document.getElementById('tryonReady'),
+        anotherBlouse: document.getElementById('tryonAnotherBlouse'),
+        blouseConfirm: document.getElementById('tryonBlouseConfirm'),
+        blouseCost: document.getElementById('tryonBlouseCost'),
+        keepPreview: document.getElementById('tryonKeepPreview'),
+        confirmBlouse: document.getElementById('tryonConfirmBlouse'),
         resultImg: document.getElementById('tryonResultImg'),
         toggleOriginal: document.getElementById('tryonToggleOriginal'),
         togglePreview: document.getElementById('tryonTogglePreview'),
@@ -258,6 +257,15 @@
       if (els.cancelJob) els.cancelJob.addEventListener('click', onCancelJobClick);
       if (els.continueShopping) els.continueShopping.addEventListener('click', function () { dialog._nirahhSetOpen(false); });
       if (els.tryAgain) els.tryAgain.addEventListener('click', onTryAgainClick);
+      if (els.anotherBlouse) els.anotherBlouse.addEventListener('click', function () {
+        setBlouseConfirmation(els.blouseConfirm.hidden);
+        if (!els.blouseConfirm.hidden) els.keepPreview.focus();
+      });
+      if (els.keepPreview) els.keepPreview.addEventListener('click', function () {
+        setBlouseConfirmation(false);
+        els.anotherBlouse.focus();
+      });
+      if (els.confirmBlouse) els.confirmBlouse.addEventListener('click', onConfirmBlouse);
       if (els.toggleOriginal) els.toggleOriginal.addEventListener('click', function () { setComparison('original'); });
       if (els.togglePreview) els.togglePreview.addEventListener('click', function () { setComparison('preview'); });
       if (els.download) els.download.addEventListener('click', onDownloadClick);
@@ -268,6 +276,7 @@
 
     function onOpenChange(show) {
       if (show) return;
+      generating = false;
       stopElapsed();
       if (activeController) { activeController.abort(); activeController = null; }
       // Dismissing the dialog pauses client-side polling only; the job
@@ -460,6 +469,10 @@
       renderCounters();
       capped = limits.effective_remaining_generations <= 0;
       updateGenerateEnabled();
+      if (capped && els.anotherBlouse) {
+        els.anotherBlouse.hidden = true;
+        setBlouseConfirmation(false);
+      }
       if (capped) {
         if (limits.account_generations_remaining_today <= 0) {
           showNotice(dailyLimitMessage(limits), 'polite');
@@ -495,7 +508,7 @@
       updatePhotoModeView();
       setPhotoControlsDisabled(false);
       clearStage();
-      readyVariantGid = null;
+      readyJob = null;
       if (els.addToBag) els.addToBag.disabled = true;
     }
 
@@ -505,9 +518,7 @@
       if (els.preview) { els.preview.removeAttribute('src'); els.preview.hidden = true; }
       if (els.resultImg) { els.resultImg.removeAttribute('src'); els.resultImg.setAttribute('alt', ''); }
       setCreateImage(null);
-      latestOriginal = null;
-      latestResult = null;
-      readyVariantGid = null;
+      readyJob = null;
       if (els.addToBag) els.addToBag.disabled = true;
       reusablePhotoId = null;
       photoMode = 'new';
@@ -632,12 +643,12 @@
     // dialog keeps the job recoverable" verify condition). A cancelled,
     // failed, quality-rejected, outcome-unknown or expired job is history,
     // not something to auto-restore (3.2's Cancelled row).
-    function findResumableJob(jobsList, p) {
+    function latestProductJob(jobsList, p, resumableOnly) {
       if (!jobsList || !p) return null;
       for (var i = jobsList.length - 1; i >= 0; i--) {
         var j = jobsList[i];
         if (j.product_gid === p.productGid && j.variant_gid === p.variantGid &&
-            (j.status === 'queued' || j.status === 'processing' || j.status === 'checking' || j.status === 'ready')) {
+            (!resumableOnly || j.status === 'queued' || j.status === 'processing' || j.status === 'checking' || j.status === 'ready')) {
           return j;
         }
       }
@@ -736,7 +747,13 @@
     // in session/resume's list. Never overlaps with another in-flight poll
     // for a superseded sequence (the token check above and in every caller).
     function handleJobStatus(data, token) {
+      if (token !== jobPollToken) return;
       currentJobId = data.job_id;
+      // Resume supplies jobs oldest first. Keep that order after local
+      // admissions too, including a retry that ended with a quality rejection.
+      var known = session.jobs.find(function (j) { return j.job_id === data.job_id; });
+      if (known) known.status = data.status;
+      else session.jobs.push({ job_id: data.job_id, status: data.status, product_gid: data.product_gid, variant_gid: data.variant_gid });
       applyLimits(data.limits);
       var key = jobKey({ productGid: data.product_gid, variantGid: data.variant_gid });
 
@@ -776,32 +793,54 @@
       // failed / quality_rejected / outcome_unknown: 3.2 keeps the Create
       // panel, replacing the stage text with the failure notice. If no
       // retry is offered because the account/session is capped, keep the
-      // more specific cap notice from applyLimits instead of the generic
-      // failure text.
+      // cap notice from applyLimits for generic failures. A quality rejection
+      // explains why no image was shown, alongside the remaining counter.
       showPanel('create');
       setCreateStage(null);
-      if (data.retry_allowed || !capped) {
+      if (data.status === 'quality_rejected' || data.retry_allowed || !capped) {
         showNotice(JOB_FAILURE_MESSAGES[data.error_code] || 'Something went wrong. Please try again.', 'assertive');
       }
       if (els.tryAgain) els.tryAgain.hidden = !data.retry_allowed;
     }
 
     function renderReady(data) {
-      latestOriginal = data.original || null;
-      latestResult = data.result || null;
-      // Server-authoritative: the job's own variant_gid, not a possibly
-      // since-changed live selector (3.6/16).
-      readyVariantGid = data.variant_gid || (product && product.variantGid) || null;
+      readyJob = data;
       showPanel('ready');
       setComparison('preview');
-      if (els.addToBag) els.addToBag.disabled = !numericIdFromGid(readyVariantGid);
+      if (els.addToBag) els.addToBag.disabled = !numericIdFromGid(data.variant_gid);
+      setBlouseConfirmation(false);
+      if (els.anotherBlouse) els.anotherBlouse.hidden = !canRepeatReady();
+    }
+
+    function canRepeatReady() {
+      return readyJob && readyJob.retry_allowed && !capped && readyJob.original && readyJob.original.photo_id &&
+        product && readyJob.product_gid === product.productGid && readyJob.variant_gid === product.variantGid;
+    }
+
+    function setBlouseConfirmation(open) {
+      if (!els.blouseConfirm) return;
+      els.blouseConfirm.hidden = !open;
+      els.anotherBlouse.setAttribute('aria-expanded', String(open));
+      if (open) els.blouseCost.textContent = session.limits.exempt_from_limits
+        ? 'Generate this saree with another blouse design? Your account has unlimited previews.'
+        : 'Trying this saree with another blouse design uses one more preview from this session.';
+    }
+
+    function onConfirmBlouse() {
+      if (generating || els.blouseConfirm.hidden || !canRepeatReady()) return;
+      generating = true;
+      reusablePhotoId = readyJob.original.photo_id;
+      photoMode = 'reuse';
+      setBlouseConfirmation(false);
+      submitJob(reusablePhotoId, readyJob);
+      if (els.continueShopping) els.continueShopping.focus();
     }
 
     function setComparison(which) {
       var usingOriginal = which === 'original';
       if (els.toggleOriginal) els.toggleOriginal.setAttribute('aria-pressed', String(usingOriginal));
       if (els.togglePreview) els.togglePreview.setAttribute('aria-pressed', String(!usingOriginal));
-      var asset = usingOriginal ? latestOriginal : latestResult;
+      var asset = readyJob && (usingOriginal ? readyJob.original : readyJob.result);
       if (!els.resultImg || !asset) return;
       els.resultImg.src = asset.url || asset.result_url;
       els.resultImg.alt = usingOriginal ? 'Your original photo' : (asset.label || 'Your AI styling preview');
@@ -816,14 +855,20 @@
       else { els.createImg.removeAttribute('src'); els.createImg.hidden = true; }
     }
 
-    function submitJob(photoId) {
+    function submitJob(photoId, previousReady) {
       var key = jobKey(product);
-      var idempotencyKey = ensureIdempotencyKey(key);
+      // Each server job has its own UUID. Two confirmations based on the
+      // same last job (even across tabs or a lost response) are one repeat.
+      // A later terminal attempt supplies a new key, including after failure.
+      var idempotencyKey = previousReady ? latestProductJob(session.jobs, product, false).job_id : ensureIdempotencyKey(key);
       var token = beginJobPollSequence();
+      currentJobId = null;
       showPanel('create');
       hideNotice();
       hideTryAgain();
-      setCreateImage(pendingObjectUrl);
+      // A revisited result's signed URL may have expired. The new job's
+      // status supplies a fresh original for its progress panel.
+      setCreateImage(previousReady ? null : pendingObjectUrl);
       setCreateStage('queued');
       var controller = newAbortController();
       api.createJob({
@@ -833,16 +878,30 @@
         variant_gid: product.variantGid,
         idempotency_key: idempotencyKey
       }, controller.signal).then(function (accepted) {
+        if (token !== jobPollToken) return;
         currentJobId = accepted.job_id;
         applyLimits(accepted.limits);
         var c2 = newAbortController();
         return api.jobStatus({ session_token: session.token, job_id: accepted.job_id }, c2.signal);
       }).then(function (full) {
+        if (token !== jobPollToken) return;
         generating = false;
         handleJobStatus(full, token);
       }).catch(function (err) {
+        if (token !== jobPollToken) return;
         generating = false;
         if (err.name === 'AbortError') return;
+        if (previousReady) {
+          if (currentJobId && err.retryable) {
+            showNotice('Your preview has started. Checking its progress…', 'polite');
+            scheduleJobPoll(token);
+            return;
+          }
+          currentJobId = previousReady.job_id;
+          renderReady(previousReady);
+          handleError(err);
+          return;
+        }
         if (err.code === 'JOB_LIMIT_REACHED') {
           if (err.limits) applyLimits(err.limits);
           resetForNewAttempt();
@@ -855,7 +914,7 @@
     }
 
     function onGenerateClick() {
-      if (generating || !canGenerate()) return;
+      if (generating || capped || !canGenerate()) return;
       generating = true;
       hideNotice();
       setPhotoControlsDisabled(true);
@@ -945,9 +1004,9 @@
       if (!currentJobId) return;
       var controller = newAbortController();
       api.jobStatus({ session_token: session.token, job_id: currentJobId }, controller.signal).then(function (data) {
-        if (!data.result) return;
-        latestOriginal = data.original || latestOriginal;
-        latestResult = data.result;
+        if (!data.result || !readyJob || readyJob.job_id !== data.job_id) return;
+        readyJob.original = data.original || readyJob.original;
+        readyJob.result = data.result;
         var a = document.createElement('a');
         a.href = data.result.result_url;
         a.download = 'nirahh-preview.jpg';
@@ -972,7 +1031,7 @@
     }
 
     function onAddToBagClick() {
-      var variantId = numericIdFromGid(readyVariantGid);
+      var variantId = numericIdFromGid(readyJob && readyJob.variant_gid);
       if (!variantId) { showNotice('Something went wrong. Please try again.', 'assertive'); return; }
       if (els.addToBag) els.addToBag.disabled = true;
       var controller = newAbortController();
@@ -1059,7 +1118,7 @@
       photoMode = 'new';
       reusablePhotoId = null;
       currentJobId = null;
-      readyVariantGid = null;
+      readyJob = null;
       if (els.addToBag) els.addToBag.disabled = true;
       resetPhotoPanel();
       updatePhotoModeView();
@@ -1082,7 +1141,7 @@
             reusablePhotoId = session.photos[session.photos.length - 1].photo_id;
             photoMode = 'reuse';
           }
-          var resumableJob = findResumableJob(session.jobs, p);
+          var resumableJob = latestProductJob(session.jobs, p, true);
           return checkEligibility(controller.signal).then(function (eligibility) {
             return { eligibility: eligibility, job: resumableJob };
           });
