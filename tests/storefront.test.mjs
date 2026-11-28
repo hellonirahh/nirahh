@@ -1089,6 +1089,41 @@ test('storefront browser regressions', async (t) => {
     assert.equal(calls.some(c => c.op.startsWith('uploads/')), false);
   });
 
+  for (const exempt of [false, true]) {
+    await t.test('a busy blouse retry keeps the original on ' + (exempt ? 'an unlimited' : 'a limited') + ' account', async () => {
+      const first = '40000000-0000-4000-8000-000000000001';
+      const busy = '40000000-0000-4000-8000-000000000002';
+      const jobs = [{ job_id: first, status: 'ready' }];
+      const limits = () => ({ ...baseLimits, exempt_from_limits: exempt });
+      const { page, calls } = await blouseFixture({
+        jobs, photos: ['original', 'other-photo'], limits,
+        create: () => {
+          const job_id = jobs.length === 1 ? busy : 'next';
+          jobs.push({ job_id, status: 'queued' });
+          return { data: { job_id, limits: limits() } };
+        },
+        status: (id) => id === busy
+          ? { status: 'failed', stage: 'stopped', error_code: 'PROVIDER_BUSY', allowance_restored: true, result: undefined }
+          : {}
+      });
+      await page.locator('#tryonAnotherBlouse').click();
+      await page.locator('#tryonConfirmBlouse').click();
+      const notice = page.locator('#tryonNotice').filter({ hasText: 'The preview service is busy right now.' });
+      await notice.waitFor();
+      const message = await notice.textContent();
+      assert.equal(message.includes('allowance was restored'), !exempt);
+      assert.equal(message.includes('may use one preview'), !exempt);
+      assert.equal(await page.locator('#tryonEarlierPreview').isVisible(), true);
+      assert.equal(calls.filter(c => c.op === 'jobs').length, 1);
+
+      await page.getByRole('button', { name: 'Generate again' }).click();
+      await page.locator('#tryonResultImg[src$="next.jpg"]').waitFor();
+      const submissions = calls.filter(c => c.op === 'jobs').map(c => c.body);
+      assert.deepEqual(submissions.map(s => [s.photo_id, s.idempotency_key]), [['original', first], ['original', busy]]);
+      assert.equal(calls.some(c => c.op.startsWith('uploads/')), false);
+    });
+  }
+
   await t.test('the first withheld job can be reopened and its photo replaced without spending a preview', async () => {
     const jobs = [{ job_id: 'withheld', status: 'quality_rejected' }];
     const { page, calls } = await blouseFixture({ jobs, photos: ['old-photo', 'newer-photo'], limits: () => baseLimits,
