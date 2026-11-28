@@ -629,6 +629,31 @@ test('storefront browser regressions', async (t) => {
     assert.equal(results.heicError, 'PHOTO_EXPORT_JPEG');
   });
 
+  await t.test('a narrow phone photo keeps its full frame when converted to the upload limits', async () => {
+    const page = await newPage();
+    await gotoFixture(page, '<main></main>');
+    const result = await page.evaluate(async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 300;
+      canvas.height = 1800;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'red';
+      ctx.fillRect(0, 0, 300, 900);
+      ctx.fillStyle = 'blue';
+      ctx.fillRect(0, 900, 300, 900);
+      const original = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const prepared = await window.NirahhTryOnPhoto.prepare(
+        new File([original], 'portrait.png', {type: 'image/png'}), {max_image_pixels: 135000});
+      const img = await createImageBitmap(prepared);
+      ctx.drawImage(img, 0, 0, 2, 2);
+      const result = [img.width, img.height, ctx.getImageData(0, 0, 1, 1).data[0], ctx.getImageData(0, 1, 1, 1).data[2]];
+      img.close();
+      return result;
+    });
+    assert.deepEqual(result.slice(0, 2), [150, 900]);
+    assert.ok(result[2] > 220 && result[3] > 220);
+  });
+
   await t.test('a phone JPEG with generic MIME uploads byte for byte and starts on completed validation', async () => {
     const page = await newPage();
     await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'q'.repeat(43)); });
@@ -660,7 +685,10 @@ test('storefront browser regressions', async (t) => {
     });
     await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'application/octet-stream', buffer: sampleJPEG });
     await page.locator('#tryonConsent').check();
-    await page.locator('#tryonGenerate').click();
+    await Promise.all([
+      page.waitForResponse('**/v1/jobs'),
+      page.locator('#tryonGenerate').click()
+    ]);
 
     await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
     assert.deepEqual(uploaded, sampleJPEG);

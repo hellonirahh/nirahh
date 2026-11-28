@@ -76,7 +76,6 @@
         if (signal && signal.aborted) throw new DOMException('Aborted', 'AbortError');
         canvas.width = Math.max(1, Math.floor(width * scale));
         canvas.height = Math.max(1, Math.floor(height * scale));
-        if (Math.min(canvas.width, canvas.height) < 256) fail('PHOTO_UNSUITABLE');
         var ctx = canvas.getContext('2d');
         if (!ctx) { scale *= 0.7; continue; }
         ctx.fillStyle = 'white';
