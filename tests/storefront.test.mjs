@@ -5,6 +5,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const root = path.resolve(import.meta.dirname, '..');
+const sampleJPEG = fs.readFileSync(path.join(root, 'assets/images/logo.jpg'));
 const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 test('storefront browser regressions', async (t) => {
@@ -175,6 +176,8 @@ test('storefront browser regressions', async (t) => {
             <div class="tryon-bar" id="tryonBar" aria-hidden="true"><span></span></div>
             <div class="tryon-photo-actions">
               <button type="button" class="btn btn-ghost" id="tryonCancelJob">Cancel</button>
+              <button type="button" id="tryonRetryPhoto" hidden>Use a different photo</button>
+              <button type="button" id="tryonEarlierPreview" hidden>View earlier preview</button>
               <button type="button" class="btn btn-ghost" id="tryonContinueShopping">Continue shopping</button>
               <button type="button" class="btn btn-solid" id="tryonTryAgain" hidden>Try again</button>
             </div>
@@ -232,6 +235,7 @@ test('storefront browser regressions', async (t) => {
     const url = `http://nirahh.test/tryon-fixture-${fixtureCount++}.html`;
     await page.route(url, (route) => route.fulfill({ contentType: 'text/html', body: html }));
     await page.goto(url);
+    await page.addScriptTag({ path: path.join(root, 'shopify-theme/assets/tryon-photo.js') });
   }
 
   const baseLimits = {
@@ -534,7 +538,7 @@ test('storefront browser regressions', async (t) => {
     // Choosing a file alone, without checking consent, must not enable
     // Generate or reach the server: a photo never reaches the server before
     // consent is explicitly given.
-    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: sampleJPEG });
     assert.equal(await page.locator('#tryonGenerate').isDisabled(), true);
     assert.equal(calls.some((c) => c.op === 'uploads/prepare'), false);
 
@@ -567,7 +571,7 @@ test('storefront browser regressions', async (t) => {
 
     await page.locator('[data-tryon-open]').click();
     await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
-    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: sampleJPEG });
     await page.locator('#tryonConsent').check();
     await page.locator('#tryonGenerate').click();
 
@@ -583,7 +587,49 @@ test('storefront browser regressions', async (t) => {
     assert.equal(await page.locator('#tryonPreview').isVisible(), false);
   });
 
-  await t.test('when uploads/complete already reports the outcome, the preview starts without a status poll', async () => {
+  await t.test('oversized phone photos keep their orientation and aspect ratio, and unsupported HEIC gives export guidance', async () => {
+    const page = await newPage();
+    await gotoFixture(page, '<main></main>');
+    const results = await page.evaluate(async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 600;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'red';
+      ctx.fillRect(0, 0, 300, 400);
+      ctx.fillStyle = 'blue';
+      ctx.fillRect(300, 0, 300, 400);
+      const jpeg = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+      // EXIF orientation 6 displays this landscape raster as a portrait.
+      const exif = Uint8Array.from([0xff, 0xe1, 0, 34, 69, 120, 105, 102, 0, 0, 77, 77, 0, 42,
+        0, 0, 0, 8, 0, 1, 1, 18, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0, 0, 0, 0, 0]);
+      const file = new File([jpeg.slice(0, 2), exif, jpeg.slice(2)], 'camera.jpg', { type: 'image/jpeg' });
+      const prepare = window.NirahhTryOnPhoto.prepare;
+      const converted = await prepare(file, { max_image_pixels: 120000 });
+      const bitmap = await createImageBitmap(converted);
+      ctx.drawImage(bitmap, 0, 0, 2, 2);
+      const top = Array.from(ctx.getImageData(0, 0, 1, 1).data);
+      const bottom = Array.from(ctx.getImageData(0, 1, 1, 1).data);
+      // Taking the byte-limit path alone must preserve all native dimensions.
+      const padded = new File([file, new Uint8Array(200000)], 'large.jpg', { type: 'image/jpeg' });
+      const byteBound = await prepare(padded, { max_upload_bytes: 100000 });
+      const native = await createImageBitmap(byteBound);
+      const ftyp = new Uint8Array([0, 0, 0, 20, ...new TextEncoder().encode('ftypheic'), 0, 0, 0, 0, ...new TextEncoder().encode('mif1')]);
+      const heicError = await prepare(new File([ftyp], 'camera.heic', { type: 'image/heic' }), {})
+        .then(() => null, err => err.code);
+      return { w: bitmap.width, h: bitmap.height, top, bottom, type: converted.type,
+        originalDims: [native.width, native.height], uploadSize: byteBound.size, heicError };
+    });
+    assert.equal(results.type, 'image/jpeg');
+    assert.ok(results.w * results.h <= 120000);
+    assert.ok(Math.abs(results.w / results.h - 2 / 3) < 0.005);
+    assert.ok(results.top[0] > 220 && results.bottom[2] > 220);
+    assert.deepEqual(results.originalDims, [400, 600]);
+    assert.ok(results.uploadSize < 100000);
+    assert.equal(results.heicError, 'PHOTO_EXPORT_JPEG');
+  });
+
+  await t.test('a phone JPEG with generic MIME uploads byte for byte and starts on completed validation', async () => {
     const page = await newPage();
     await page.addInitScript(() => { sessionStorage.setItem('nirahh_tryon_session_token', 'q'.repeat(43)); });
     await gotoFixture(page, `${tryonDialogFixture(true)}
@@ -605,11 +651,20 @@ test('storefront browser regressions', async (t) => {
 
     await page.locator('[data-tryon-open]').click();
     await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
-    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    let uploaded;
+    await page.route('http://nirahh.test/upload-sink', async route => {
+      const request = route.request();
+      const form = await new Response(request.postDataBuffer(), { headers: { 'Content-Type': request.headers()['content-type'] } }).formData();
+      uploaded = Buffer.from(await form.get('file').arrayBuffer());
+      await route.fulfill({ status: 201, body: '' });
+    });
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'application/octet-stream', buffer: sampleJPEG });
     await page.locator('#tryonConsent').check();
     await page.locator('#tryonGenerate').click();
 
     await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });
+    assert.deepEqual(uploaded, sampleJPEG);
+    assert.equal(calls.find(c => c.op === 'uploads/prepare').body.content_type, 'image/jpeg');
     assert.equal(calls.find((c) => c.op === 'jobs').body.photo_id, 'p3');
     assert.equal(calls.some((c) => c.op === 'uploads/status'), false);
   });
@@ -633,7 +688,7 @@ test('storefront browser regressions', async (t) => {
 
     await page.locator('[data-tryon-open]').click();
     await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
-    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: sampleJPEG });
     await page.locator('#tryonConsent').check();
     await page.locator('#tryonGenerate').click();
 
@@ -665,7 +720,7 @@ test('storefront browser regressions', async (t) => {
 
     await page.locator('[data-tryon-open]').click();
     await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
-    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: sampleJPEG });
     await page.locator('#tryonConsent').check();
     await page.locator('#tryonGenerate').click();
 
@@ -732,7 +787,7 @@ test('storefront browser regressions', async (t) => {
 
     await page.locator('[data-tryon-open]').click();
     await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
-    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: sampleJPEG });
     await page.locator('#tryonConsent').check();
     await page.locator('#tryonGenerate').click();
 
@@ -838,7 +893,7 @@ test('storefront browser regressions', async (t) => {
 
     await page.locator('[data-tryon-open]').click();
     await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
-    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: sampleJPEG });
     await page.locator('#tryonConsent').check();
 
     // Two click() calls on the same tick: the handler disables the button
@@ -956,21 +1011,65 @@ test('storefront browser regressions', async (t) => {
   await t.test('reopening follows the active repeat, explains a rejected last attempt and keeps the earlier result available', async () => {
     const jobs = [{ job_id: 'first', status: 'ready' }, { job_id: 'second', status: 'processing' }];
     const limits = () => ({ ...baseLimits, remaining_generations: 0, effective_remaining_generations: 0 });
-    const { page, calls, reopen } = await blouseFixture({ jobs, photos: ['photo'], limits,
+    const { page, calls } = await blouseFixture({ jobs, photos: ['photo'], limits,
       status: (id) => {
         if (id === 'first') return {};
         jobs[1].status = 'quality_rejected';
         return { status: 'quality_rejected', stage: 'stopped', error_code: 'QUALITY_REJECTED', result: undefined };
       }
     });
-    await page.locator('#tryonNotice').filter({ hasText: "couldn't create a faithful preview" }).waitFor();
+    await page.locator('#tryonNotice').filter({ hasText: 'image changed too much' }).waitFor();
+    assert.doesNotMatch(await page.locator('#tryonNotice').textContent(), /allowance was restored/);
     assert.equal(await page.locator('#tryonReady').isHidden(), true);
     assert.equal(await page.locator('#tryonTryAgain').isHidden(), true);
-    await reopen();
+    await page.getByRole('button', { name: 'View earlier preview' }).click();
     await page.locator('#tryonResultImg[src$="first.jpg"]').waitFor();
     assert.equal(await page.locator('#tryonAnotherBlouse').isHidden(), true);
     assert.deepEqual(calls.filter(c => c.op === 'jobs/status').map(c => c.body.job_id), ['second', 'first']);
     assert.equal(calls.some(c => c.op === 'jobs'), false);
+  });
+
+  await t.test('a withheld preview restores the displayed allowance and retries the same original only on an explicit click', async () => {
+    const rejected = '20000000-0000-4000-8000-000000000002';
+    const jobs = [{ job_id: 'first', status: 'ready' }, { job_id: rejected, status: 'processing' }];
+    const limits = () => ({ ...baseLimits, remaining_generations: 1, effective_remaining_generations: 1 });
+    let creates = 0;
+    const { page, calls } = await blouseFixture({ jobs, photos: ['original', 'another-photo'], limits,
+      status: (id) => id === rejected ? { status: 'quality_rejected', stage: 'stopped', error_code: 'QUALITY_REJECTED',
+        allowance_restored: true, result: undefined } : {},
+      create: () => ++creates === 1
+        ? { status: 503, error: { code: 'SERVICE_UNAVAILABLE', message: 'Request still unconfirmed.', retryable: true } }
+        : { data: { job_id: 'new-preview', limits: limits() } }
+    });
+    const retry = page.getByRole('button', { name: 'Generate again' });
+    await retry.waitFor();
+    assert.match(await page.locator('#tryonNotice').textContent(), /allowance was restored/);
+    assert.match(await page.locator('#tryonCounters').textContent(), /1 preview left/);
+    assert.equal(await page.locator('#tryonEarlierPreview').isVisible(), true);
+    assert.equal(await page.locator('#tryonCancelJob').isHidden(), true);
+    assert.equal(creates, 0);
+    await retry.evaluate(b => { b.click(); b.click(); });
+    await page.locator('#tryonNotice').filter({ hasText: 'Request still unconfirmed.' }).waitFor();
+    assert.equal(creates, 1);
+    await retry.click();
+    await page.locator('#tryonResultImg[src$="new-preview.jpg"]').waitFor();
+    const requests = calls.filter(c => c.op === 'jobs').map(c => c.body);
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].idempotency_key, rejected);
+    assert.equal(requests[0].photo_id, 'original');
+    assert.deepEqual(requests[1], requests[0]);
+    assert.equal(calls.some(c => c.op.startsWith('uploads/')), false);
+  });
+
+  await t.test('the first withheld job can be reopened and its photo replaced without spending a preview', async () => {
+    const jobs = [{ job_id: 'withheld', status: 'quality_rejected' }];
+    const { page, calls } = await blouseFixture({ jobs, photos: ['old-photo', 'newer-photo'], limits: () => baseLimits,
+      status: () => ({ status: 'quality_rejected', allowance_restored: true, result: undefined }) });
+    await page.locator('#tryonRetryPhoto').click();
+    await page.locator('#tryonUploadFields').waitFor();
+    assert.equal(await page.locator('#tryonReuse').isHidden(), true);
+    assert.equal(await page.locator('#tryonGenerate').isDisabled(), true);
+    assert.equal(calls.some(c => c.op === 'jobs' || c.op.startsWith('uploads/')), false);
   });
 
   await t.test('dismissing the dialog keeps the job recoverable without re-uploading or re-creating it', async () => {
@@ -1005,7 +1104,7 @@ test('storefront browser regressions', async (t) => {
 
     await page.locator('[data-tryon-open]').click();
     await page.waitForFunction(() => !document.getElementById('tryonFile').disabled);
-    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([1, 2, 3, 4]) });
+    await page.locator('#tryonFile').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: sampleJPEG });
     await page.locator('#tryonConsent').check();
     await page.locator('#tryonGenerate').click();
     await page.waitForFunction(() => !document.getElementById('tryonCreate').hidden, null, { timeout: 5000 });

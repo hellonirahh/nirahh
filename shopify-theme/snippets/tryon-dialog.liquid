@@ -127,9 +127,9 @@
               <label class="tryon-file-label tryon-drop" for="tryonFile">
                 <span class="tryon-drop-icon" aria-hidden="true"></span>
                 <span class="tryon-drop-title">Upload a full-length photo</span>
-                <span class="tryon-drop-sub">JPEG, PNG or WebP, up to 10 MB</span>
+                <span class="tryon-drop-sub">JPEG, PNG, WebP or a phone HEIC photo</span>
               </label>
-              <input class="tryon-file-input" type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp">
+              <input class="tryon-file-input" type="file" id="tryonFile" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif">
               <img class="tryon-preview tryon-hero-img" id="tryonPreview" alt="Your photo preview" width="768" height="1024" hidden>
               <div class="tryon-chips">
                 <button type="button" class="tryon-chip" id="tryonChangePhoto" hidden>Change photo</button>
@@ -188,10 +188,12 @@
           </ol>
           <div class="tryon-bar" id="tryonBar" aria-hidden="true"><span></span></div>
           <div class="tryon-primary">
-            <button type="button" class="btn btn-solid" id="tryonTryAgain" hidden>Try again</button>
+            <button type="button" class="btn btn-solid" id="tryonTryAgain" aria-describedby="tryonNotice" hidden>Try again</button>
           </div>
           <div class="tryon-secondary">
             <button type="button" class="tryon-link" id="tryonCancelJob">Cancel</button>
+            <button type="button" class="tryon-link" id="tryonRetryPhoto" hidden>Use a different photo</button>
+            <button type="button" class="tryon-link" id="tryonEarlierPreview" hidden>View earlier preview</button>
             <button type="button" class="tryon-link" id="tryonContinueShopping">Continue shopping</button>
           </div>
         </div>
