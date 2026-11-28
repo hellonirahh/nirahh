@@ -26,6 +26,7 @@
 
   var JOB_FAILURE_MESSAGES = {
     GENERATION_FAILED: "We couldn't create your preview. Try again.",
+    PROVIDER_BUSY: "The preview service is busy right now. Please try again in a moment.",
     OUTCOME_UNKNOWN: "We couldn't confirm what happened with that preview."
   };
 
@@ -811,7 +812,7 @@
         setCreateImage(data.original && data.original.url);
         var message = data.status === 'quality_rejected'
           ? 'The generated image changed too much to use as your preview.'
-          : 'Your preview is unavailable.';
+          : JOB_FAILURE_MESSAGES[data.error_code] || 'Your preview is unavailable.';
         if (data.allowance_restored === true && !data.limits.exempt_from_limits) {
           message += ' Your preview allowance was restored.';
         }
